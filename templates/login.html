@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    <title>登录</title>
+</head>
+<body>
+    <canvas id="myCanvas" class="myCanvas"></canvas>
+    <script src="{{ url_for('static', filename='js/rain.js') }}"></script>
+    <div class="login-wrapper">
+        <div class="header">登录</div>
+        <form method="POST">
+            <div class="form-wrapper">
+                <input type="text" name="username" placeholder="用户名" class="input-item" required>
+                <input type="password" name="password" placeholder="密码" class="input-item" required>
+                <button type="submit" class="btn">登录</button>
+            </div>
+            <div class="msg">
+                没有账户?
+                <a href="/register">注册</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

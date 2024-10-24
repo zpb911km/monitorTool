@@ -1,0 +1,272 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+html {
+    color: rgb(255, 255, 255);
+    background-color: #000027;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.myCanvas {
+    position:absolute;
+    z-index:-2;
+    width: 100%;
+    height: 100%;
+}
+
+.login {
+    width: 25%;
+    height: 25%;
+    position:absolute;
+    top:50%;
+    left:50%;
+    background-color: darkgreen;
+}
+
+.input-item {
+    display: block;
+    width: 100%;
+    margin-bottom: 20px;
+    border: 0;
+    padding: 10px;
+    border-bottom: 2px solid rgb(3, 50, 45);
+    font-size: 20px;
+    outline: none;
+    background-color: transparent;
+    color: #ffffff;
+}
+
+.input-item:placeholder {
+    text-transform: uppercase;
+}
+
+input[type="datetime-local"] {
+    display: block;
+    width: 100%;
+    margin-bottom: 20px;
+    border: 0;
+    padding: 10px;
+    border-bottom: 2px solid rgb(3, 50, 45);
+    font-size: 20px;
+    outline: none;
+    background-color: transparent;
+    color: #ffffff;
+    box-sizing: border-box;
+}
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+}
+
+.btn {
+    text-align: center;
+    padding: 10px;
+    width: 100%;
+    margin-top: 40px;
+    background-image: linear-gradient(to right, #03112a, #062703);
+    color: #fff;
+    margin: 0 0 0 0;
+}
+
+.msg {
+    text-align: center;
+    line-height: 88px;
+}
+
+a {
+    color: rgb(55, 208, 255);
+    text-decoration: underline;
+}
+
+.login-wrapper {
+    background-color: #181818b4;
+    width: 358px;
+    height: 588px;
+    border-radius: 15px;
+    padding: 0 50px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.header {
+    font-size: 38px;
+    font-weight: bold;
+    text-align: center;
+    line-height: 200px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 2px solid #004b2d;
+}
+
+input[type=password]::-ms-reveal {
+    filter: invert(100%);   
+}
+
+a {
+    color: rgb(55, 208, 255);
+    text-decoration: underline;
+}
+
+.sidebar {
+    width: 20%;
+    height: 100%;
+    background-color: #343a40;
+    color: white;
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    border-left: #000027 20px solid;
+}
+
+.content {
+    width: 80%;
+    height: 100vh;
+    background-color: #000000;
+    color: rgb(255, 255, 255);
+    overflow-y: auto;
+    border-left: #000027 5px solid;
+}
+
+ul li{
+    list-style: none;
+    margin: 0;
+    padding: 1%;
+}
+
+.sidebar-button {
+    background-color: rgb(0, 35, 23);
+    color: white;
+    border: none;
+    width: 100%;
+    height: 30px;
+    border-radius: 0px;
+}
+
+.sidebar-button:hover {
+    background-color: rgb(0, 66, 43);
+}
+
+details {
+    border-top:#4f565f 2px solid;
+    border-left:#4f565f 2px solid;
+    margin: 10px 0;
+    padding: 10px;
+    background-image: linear-gradient(to right, #03112a, #062703);
+}
+
+summary {
+    font-weight: bold;
+    cursor: pointer;
+}
+
+summary::marker {
+    content: '►';
+    display: inline-block;
+    margin-right: 5px;
+}
+
+details[open] summary::marker {
+    content: '▼';
+}
+
+details {
+    transition: background-color 0.2s ease;
+}
+
+@media (max-width: 600px) {
+    details {
+        font-size: 14px;
+    }
+}
+
+.error-container {
+    text-align: left;
+    width: 50%;
+    padding: 100px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border: 100px solid #ff0000;
+    border-radius: 5px;
+    font-size: 25px;
+}
+
+.class-input {
+    background-color: #000000;
+    color: #000000;
+    border: 1px solid #000000;
+}
+
+.class-input::placeholder {
+    color: #000000;
+}
+
+.class-input:hover::placeholder {
+    color: #ffffff;
+}
+
+.class-input:hover {
+    background-color: #000000;
+    color: #ffffff;
+    border: 1px solid #062703;
+}
+
+.class-input:focus {
+    background-color: #062703;
+    color: #ffffff;
+    border: 1px solid #004b2d;
+}
+
+.class-input:not(:placeholder-shown) {
+    background-color: #062703;
+    color: #ffffff;
+    border: 1px solid #004b2d;
+}
+
+.class-btn {
+    background-color: #000000;
+    color: #000000;
+    cursor: pointer;
+    border: none;
+    width: 100%;
+}
+
+.class-btn:hover {
+    background-color: #062703;
+    color: #ffffff;
+    border: 1px solid #062703;
+}
+
+.class-delete-btn {
+    background-color: #440101;
+    color: #ffffff;
+    cursor: pointer;
+    border: none;
+}
+
+.class-delete-btn:hover {
+    background-color: #a40101;
+}
+
+.cell {
+    overflow: auto;
+    max-height: 100px;
+    scrollbar-width: 0;
+    -ms-overflow-style: none;
+}
+
+.cell::-webkit-scrollbar {
+    display: none;
+}

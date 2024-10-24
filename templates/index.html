@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="UTF-8">
+        <title>home</title>
+        <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    </head>
+    <body>
+        <header>
+            <div>
+                <span>当前用户: <!--name--></span>
+            </div>
+            <div>
+                <a href="/logout">退出登录</a>
+                |
+                <a href="/feedback">发送反馈</a>
+            </div>
+        </header>
+        <div style="display: flex; flex: 1;">
+            <div class="sidebar">
+                <nav>
+                    <ul style="padding: 0; margin: 0;">
+                        <li>
+                            <button class="sidebar-button" onclick="location.href='/'">首页</button>
+                        </li>
+                        <!--Class List-->
+                        <li>
+                            <button class="sidebar-button" onclick="location.href='/create_class'">新建班级</button>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="content">
+                <!--Content-->
+            </div>
+        </div>
+    </body>
+</html>

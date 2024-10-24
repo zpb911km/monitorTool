@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title><!--Err_title--></title>
+        <style>
+            html {
+                background-color: black;
+                color: white;
+            }
+            body {
+                display: flex;
+                justify-content: center; /* 横向居中 */
+                align-items: center;    /* 纵向居中 */
+                height: 100vh;         /* 使 body 高度占满整个视口 */
+                margin: 0;             /* 清除默认的 margin */
+            }
+            .error-container {
+                text-align: left;      /* 文字靠左 */
+                width: 50%;          /* 设置一个固定宽度 */
+                padding: 100px;         /* 内边距 */
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* 添加阴影效果 */
+                border: 100px solid #ff0000; /* 边框样式 */
+                border-radius: 5px;    /* 边框圆角 */
+                font-size: 25px;      /* 字体大小 */
+            }
+            a {
+                color: rgb(55, 208, 255);
+                text-decoration: underline;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="error-container">
+            <h1><!--Err_title--></h1>
+            <p><!--Err_content--></p>
+            <a href='/'>返回主页面</a>
+        </div>
+    </body>
+</html>

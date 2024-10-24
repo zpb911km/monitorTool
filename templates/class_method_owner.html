@@ -1,0 +1,13 @@
+<div style="margin: 10px;">
+    <button onclick="window.location.href='/class/<!--class_name-->/schedule'" class="btn">集体课表</button>
+    <!--confirm_details-->
+    <button onclick="window.location.href='/class/<!--class_name-->/write_notification'" class="btn">新建通知</button>
+    <details>
+        <summary>编辑班级成员</summary>
+        <form method="post" style="text-align: center;">
+            <textarea id="members" name="members" class="input-item" rows="<!--len-->"><!--members--></textarea>
+            <button type="submit" class="btn" style="width: 90%;">更新成员</button>
+        </form>
+    </details>
+    <button onclick="window.location.href='/class/<!--class_name-->/exit'" class="btn" style="background-color: #dc143c;">解散班级</button>
+</div>
