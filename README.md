@@ -20,4 +20,4 @@
 ## 现在还不能用！！！
 该项目还在开发中，目前还不能使用。
 
-详情请见：[开发分支](https://github.com/zpb911km/monitorTool/dev)
+详情请见：[开发分支](https://github.com/zpb911km/monitorTool/tree/dev)
