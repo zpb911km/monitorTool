@@ -42,21 +42,17 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        if Person.query.filter_by(username=username, password=password).first():  # 如果用户名和密码正确
-            id = Person.query.filter_by(username=username, password=password).first().id  # 获取用户 ID
+        person = Person.query.filter_by(username=username, password=password).first()
+        if person:  # 如果用户名和密码正确
+            id = person.id  # 获取用户 ID
             key = generate_login_key(id)  # 生成登录密钥
             resp = make_response(redirect('/'))  # 重定向到主页
-            resp.set_cookie('id', str(id), max_age=60*60*24*365)  # 设置登录 ID 作为 cookie
-            resp.set_cookie('key', key, max_age=60*60*24*365)  # 设置登录密钥作为 cookie
+            resp.set_cookie('id', str(id), max_age=60*60*24*3)  # 设置登录 ID 作为 cookie
+            resp.set_cookie('key', key, max_age=60*60*24*3)  # 设置登录密钥作为 cookie
             login_ip = request.remote_addr  # 获取登录 IP 地址
-            if Person.query.filter_by(username=username, password=password).first().ips is None:  # 如果 IP 地址列表为空
-                Person.query.filter_by(username=username, password=password).first().ips = login_ip  # 将登录 IP 地址添加到 IP 地址列表中
-                db.session.commit()  # 提交更改
-            elif login_ip not in Person.query.filter_by(username=username, password=password).first().ips.split(', '):  # 如果登录 IP 地址不在 IP 地址列表中
-                Person.query.filter_by(username=username, password=password).first().ips = f'{login_ip}, {Person.query.filter_by(username=username, password=password).first().ips}'  
-                db.session.commit()  # 提交更改session['id'] = id  # 将用户 ID 存储在会话中
+            if person.login_ip(login_ip):
+                send_warning(person.email, person.name, login_ip)  # 发送警告邮件
             session['id'] = id  # 将用户 ID 存储在会话中
-            send_warning(Person.query.filter_by(id=id).first().email, Person.query.filter_by(id=id).first().name, login_ip)  # 发送警告邮件
             return resp
         else:
             err = Html_Error('用户名或密码错误', '用户名或密码错误<a href="/login">返回登录</a>')  # 显示错误信息

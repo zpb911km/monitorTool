@@ -16,6 +16,19 @@ class Person(db.Model):
     courses = db.Column(db.Text)  # 以逗号分隔的课程 ID 字符串
     classes = db.Column(db.Text)  # 以逗号分隔的班级 ID 字符串
 
+    def login_ip(self, ip: str) -> None:
+        warn = False
+        if self.ips is None:
+            self.ips = ip
+            warn = True
+        elif ip not in self.ips.split(', '):
+            self.ips += f', {ip}'
+            warn = True
+        db.session.commit()
+        return warn
+
+
+
 class Course(db.Model):
     __tablename__ = 'courses'
 
