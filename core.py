@@ -1,11 +1,12 @@
-from init import db
+from init import db, redirect
 import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
 import re
 
+
 class Person(db.Model):
-    __tablename__ = 'persons'
+    __tablename__ = "persons"
 
     id = db.Column(db.Integer, primary_key=True, unique=True)  # 这里设为整数
     name = db.Column(db.String(256))  # 设置长度为 256
@@ -18,34 +19,35 @@ class Person(db.Model):
 
     def login_ip(self, ip: str) -> None:
         warn = False
-        if self.ips is None:
+        if ", " in self.ips:
             self.ips = ip
             warn = True
-        elif ip not in self.ips.split(', '):
-            self.ips += f', {ip}'
+        elif ip not in self.ips.split(", "):
+            self.ips += f", {ip}"
             warn = True
         db.session.commit()
         return warn
 
 
-
 class Course(db.Model):
-    __tablename__ = 'courses'
+    __tablename__ = "courses"
 
     id = db.Column(db.String(256), primary_key=True)  # 设置长度为 256
     name = db.Column(db.String(256))  # 设置长度为 256
     teacher = db.Column(db.String(256))  # 设置长度为 256
     courcations = db.Column(db.Text)  # 以逗号分隔的课程 ID 字符串
 
+
 class Courcation(db.Model):
-    __tablename__ = 'courcations'
+    __tablename__ = "courcations"
 
     id = db.Column(db.String(256), primary_key=True)  # 设置长度为 256
     location = db.Column(db.String(256))  # 设置长度为 256
     time_tables = db.Column(db.Text)  # 以逗号分隔的 (w, d, n) 元组(int, int, int) 字符串
 
+
 class Class(db.Model):
-    __tablename__ = 'classes'
+    __tablename__ = "classes"
 
     id = db.Column(db.String(256), primary_key=True)  # 设置长度为 256
     name = db.Column(db.String(256))  # 设置长度为 256
@@ -53,8 +55,9 @@ class Class(db.Model):
     students = db.Column(db.Text)  # 以逗号分隔的学生 ID 字符串
     notifications = db.Column(db.Text)  # 以逗号分隔的通知 ID 字符串
 
+
 class Notification(db.Model):
-    __tablename__ = 'notifications'
+    __tablename__ = "notifications"
 
     id = db.Column(db.String(256), primary_key=True)  # 设置长度为 256
     title = db.Column(db.String(256))  # 设置长度为 256
@@ -65,85 +68,84 @@ class Notification(db.Model):
 
 
 class Html_index:
-    def __init__(self, user: Person, class_names: list[str], main_area: str = '', **kwargs) -> None:
+    def __init__(self, user: Person, class_names: list[str], main_area: str = "", **kwargs) -> None:
         self.user = user
         self.class_names = class_names
         self.main_area = main_area
 
     def get_html(self) -> str:
-        html = open('./templates/index.html', 'r', encoding='utf-8').read()
+        html = open("./templates/index.html", "r", encoding="utf-8").read()
         link = f'<a href="/user/{self.user.username}">{self.user.username}</a>'
-        html = html.replace('<!--name-->', link)
-        links = ''
+        html = html.replace("<!--name-->", link)
+        links = ""
         for class_name in self.class_names:
-            links += f'<li>\n<button class=\"sidebar-button\" onclick=\"location.href=\'/class/{class_name}\'\">{class_name}</button>\n</li>\n'
-        html = html.replace('<!--Class List-->', links)
-        html = html.replace('<!--Content-->', self.main_area)
+            links += f'<li>\n<button class="sidebar-button" onclick="location.href=\'/class/{class_name}\'">{class_name}</button>\n</li>\n'
+        html = html.replace("<!--Class List-->", links)
+        html = html.replace("<!--Content-->", self.main_area)
         return html
-    
+
 
 class Html_Error:
     def __init__(self, error: str, error_message: str) -> None:
         self.error = error
         self.error_message = error_message
-    
+
     def get_html(self) -> str:
-        html = open('./templates/Error.html', 'r', encoding='utf-8').read()
-        html = html.replace('<!--Err_title-->', self.error)
-        html = html.replace('<!--Err_content-->', self.error_message)
+        html = open("./templates/Error.html", "r", encoding="utf-8").read()
+        html = html.replace("<!--Err_title-->", self.error)
+        html = html.replace("<!--Err_content-->", self.error_message)
         return html
-    
+
 
 def send_verify(to: str, name: str, verify_code: int):
-    mail_info = open('data/mail_key', 'r', encoding='utf-8').read().split('\n')
+    mail_info = open("data/mail_key", "r", encoding="utf-8").read().split("\n")
     from_addr = mail_info[0]
     password = mail_info[1]
     smtp_server = mail_info[2]
 
-    head="登录验证码"
-    text=f"{name} 您好\n您的登录验证码为：{verify_code}\n登录成功后才会失效。\n切勿泄露给他人。"
+    head = "登录验证码"
+    text = f"{name} 您好\n您的登录验证码为：{verify_code}\n登录成功后才会失效。\n切勿泄露给他人。"
 
-    msg = MIMEText(text,'plain','utf-8')
-    
+    msg = MIMEText(text, "plain", "utf-8")
+
     # 邮件头信息
-    msg['From'] = Header(from_addr)
-    msg['To'] = Header(to)
-    msg['Subject'] = Header(head)
-    
+    msg["From"] = Header(from_addr)
+    msg["To"] = Header(to)
+    msg["Subject"] = Header(head)
+
     # 开启发信服务，这里使用的是加密传输
-    server=smtplib.SMTP_SSL(smtp_server)
-    server.connect(smtp_server,465)
+    server = smtplib.SMTP_SSL(smtp_server)
+    server.connect(smtp_server, 465)
     server.login(from_addr, password)
     server.sendmail(from_addr, to, msg.as_string())
     server.quit()
 
 
 def send_warning(to: str, name: str, ip: str):
-    mail_info = open('data/mail_key', 'r', encoding='utf-8').read().split('\n')
+    mail_info = open("data/mail_key", "r", encoding="utf-8").read().split("\n")
     from_addr = mail_info[0]
     password = mail_info[1]
     smtp_server = mail_info[2]
-    users = ''
+    users = ""
     all_people = Person.query.all()
     for person in all_people:
         if person.ips is not None:
-            if ip in person.ips.split(', '):
-                users += f'{person.name}({person.username})\n'
+            if ip in person.ips.split(", "):
+                users += f"{person.name}({person.username})\n"
 
+    head = "新地址登录警告"
+    text = f"{name} 您好\n你的账户在 {ip} 登录，请注意安全。\n如非本人操作，请及时修改密码。\n其他从此ip登录的用户如下：\n{users}"
 
-    head="新地址登录警告"
-    text=f"{name} 您好\n你的账户在 {ip} 登录，请注意安全。\n如非本人操作，请及时修改密码。\n其他从此ip登录的用户如下：\n{users}"
+    msg = MIMEText(text, "plain", "utf-8")
 
-    msg = MIMEText(text,'plain','utf-8')
-    
     # 邮件头信息
-    msg['From'] = Header(from_addr)
-    msg['To'] = Header(to)
-    msg['Subject'] = Header(head)
-    
+    msg["From"] = Header(from_addr)
+    msg["To"] = Header(to)
+    msg["Subject"] = Header(head)
+
     # 开启发信服务，这里使用的是加密传输
-    server=smtplib.SMTP_SSL(smtp_server)
-    server.connect(smtp_server,465)
+    server = smtplib.SMTP_SSL(smtp_server)
+    server.connect(smtp_server, 465)
     server.login(from_addr, password)
     server.sendmail(from_addr, to, msg.as_string())
     server.quit()
@@ -158,12 +160,13 @@ def is_valid_email(email: str) -> bool:
     返回:
         bool: 如果电子邮件格式合法，返回 True；否则返回 False。
     """
-    pattern = r'^[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)*@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$'
+    pattern = r"^[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)*@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$"
     return re.match(pattern, email) is not None
+
 
 def is_valid_username(username: str) -> bool:
     """验证用户名格式是否合法。
-    用户名只能包含字母（大小写都可以）、数字、下划线（_）和破折号（-）
+    用户名不能包含非法字符，特别是HTML和MySQL中可能被用于攻击的字符。
 
     参数:
         username (str): 要验证的用户名。
@@ -171,7 +174,16 @@ def is_valid_username(username: str) -> bool:
     返回:
         bool: 如果用户名格式合法，返回 True；否则返回 False。
     """
-    pattern = r'^[a-zA-Z0-9_-]{1,20}$'
+    # 定义非法字符
+    illegal_characters = r"[<>'\";()&%$#@!\\\[\]{}=`~]+"
+
+    # 检查是否包含非法字符
+    if re.search(illegal_characters, username):
+        return False
+
+    # 检查合法字符范围（字母、数字、下划线、破折号和中文）
+    pattern = r"^[\u4e00-\u9fa5a-zA-Z0-9_-]{1,20}$"
+
     return re.match(pattern, username) is not None
 
 
@@ -188,5 +200,5 @@ def is_valid_password(password: str) -> bool:
     返回:
         bool: 如果密码格式合法，返回 True；否则返回 False。
     """
-    pattern = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])[a-zA-Z0-9_-]{8,20}$'
+    pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])[a-zA-Z0-9_-]{8,20}$"
     return re.match(pattern, password) is not None
