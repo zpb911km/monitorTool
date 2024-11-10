@@ -3,6 +3,8 @@ import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
 import re
+import pandas as pd
+from flask import render_template
 
 
 class Person(db.Model):
@@ -37,6 +39,18 @@ class Course(db.Model):
     teacher = db.Column(db.String(256))  # 设置长度为 256
     courcations = db.Column(db.Text)  # 以逗号分隔的课程 ID 字符串
 
+    def update(id: str, name: str, teacher: str, courcations: str) -> bool:
+        course = Course.query.filter_by(id=id).first()
+        if course is None:
+            course = Course(id=id, name=name, teacher=teacher, courcations=courcations + ",")
+            db.session.add(course)
+        else:
+            if course.name != name or course.teacher != teacher:
+                return False
+            course.courcations += courcations + ","
+        db.session.commit()
+        return True
+
 
 class Courcation(db.Model):
     __tablename__ = "courcations"
@@ -44,6 +58,16 @@ class Courcation(db.Model):
     id = db.Column(db.String(256), primary_key=True)  # 设置长度为 256
     location = db.Column(db.String(256))  # 设置长度为 256
     time_tables = db.Column(db.Text)  # 以逗号分隔的 (w, d, n) 元组(int, int, int) 字符串
+
+    def update(id: str, location: str, time_tables: str) -> None:
+        courcation = Courcation.query.filter_by(id=id).first()
+        if courcation is None:
+            courcation = Courcation(id=id, location=location, time_tables=time_tables)
+            db.session.add(courcation)
+        else:
+            courcation.location = location
+            courcation.time_tables = time_tables
+        db.session.commit()
 
 
 class Class(db.Model):
@@ -68,14 +92,14 @@ class Notification(db.Model):
 
 
 class Html_index:
-    def __init__(self, user: Person, class_names: list[str], main_area: str = "", **kwargs) -> None:
+    def __init__(self, user: Person, main_area: str = "") -> None:
         self.user = user
-        self.class_names = class_names
+        self.class_names = user.classes.split(", ") if user.classes is not None else []
         self.main_area = main_area
 
     def get_html(self) -> str:
         html = open("./templates/index.html", "r", encoding="utf-8").read()
-        link = f'<a href="/user/{self.user.username}">{self.user.username}</a>'
+        link = f'<a href="/user">{self.user.username}</a>'
         html = html.replace("<!--name-->", link)
         links = ""
         for class_name in self.class_names:
@@ -83,6 +107,15 @@ class Html_index:
         html = html.replace("<!--Class List-->", links)
         html = html.replace("<!--Content-->", self.main_area)
         return html
+
+    def get_index_html(self) -> str:
+        return self.get_html()
+
+    def get_user_html(self) -> str:
+        main_area = open("./templates/userinfo.html", "r", encoding="utf-8").read()
+        main_area = main_area.replace("<!--username-->", self.user.username)
+        self.main_area = main_area
+        return self.get_html()
 
 
 class Html_Error:
@@ -202,3 +235,70 @@ def is_valid_password(password: str) -> bool:
     """
     pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])[a-zA-Z0-9_-]{8,20}$"
     return re.match(pattern, password) is not None
+
+
+def parse_xls(file_content: str) -> str:
+    """解析 Excel 文件内容。
+
+    参数:
+        file_content (str): Excel 文件内容。
+
+    返回:
+
+    """
+    course_list = pd.read_html(file_content)[-2].values.tolist()
+    course_ids = ""
+    for n in range(6):
+        for d in range(7):
+            try:
+                # print(course_list[2 * n][d + 1].strip(), d, n)
+                course_ids += parse_course(course_list[2 * n][d + 1].strip(), d, n) + ","
+            except AttributeError:
+                pass
+    print(course_ids)
+    return course_ids
+
+
+def parse_course(source_t: str, weekday: int, number: int) -> str:
+    if len(source_t.split(")) ")) > 1:
+        out = ""
+        for t in source_t.split(")) ")[:-1]:
+            out += parse_course((t + "))").strip(), weekday, number) + ","
+        out += parse_course(source_t.split(")) ")[-1].strip(), weekday, number)
+        return out
+    string = source_t.strip()
+    name = string.split(" ")[0]
+    string = string.replace(name, "").strip()
+    id = string.split(" ")[0]
+    string = string.replace(id, "").strip()
+    id = id.replace("(", "").replace(")", "")
+    teacher = string.split(" ")[0]
+    string = string.replace(teacher, "").strip()
+    teacher = teacher.replace("(", "").replace(")", "")
+    time = string.split(" ")[0].replace("(", "")
+    weeks = []
+    for weekp in time.split(","):
+        if "-" in weekp and ("单" in weekp or "双" in weekp):
+            for w in range(int(weekp.split("-")[0]), int(weekp.split("-")[1].split("单")[0].split("双")[0]) + 1, 2):
+                weeks.append(w)
+        elif "-" in weekp and "单" not in weekp and "双" not in weekp:
+            for w in range(int(weekp.split("-")[0]), int(weekp.split("-")[1]) + 1):
+                weeks.append(w)
+        else:
+            weeks.append(int(weekp))
+    location = string.replace("(" + time + " ", "").strip()[:-1]
+    print(name)
+    print(id)
+    print(teacher)
+    print(weeks)
+    print(location)
+    courcation_id = id + location
+    courcation_location = location
+    courcation_time_tables = ""
+    for week in weeks:
+        courcation_time_tables += f"{week}|{weekday}|{number},"
+    courcation_time_tables = courcation_time_tables[:-1]
+    Courcation.update(courcation_id, courcation_location, courcation_time_tables)
+    while not Course.update(id, name, teacher, courcation_id):
+        id += "+"
+    return id

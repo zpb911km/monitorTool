@@ -2,8 +2,10 @@ from flask import Flask, render_template, session, redirect, url_for, request, m
 from flask_sqlalchemy import SQLAlchemy
 import random
 from init import app, db
-from core import Person, Html_Error, Html_index, send_verify, send_warning, is_valid_email, is_valid_username, is_valid_password
+from core import Person, Html_Error, Html_index, send_verify, send_warning, is_valid_email, is_valid_username, is_valid_password, parse_xls
 import traceback
+import os
+from time import sleep
 
 en_key = ""  # 加密密钥
 
@@ -40,9 +42,88 @@ def home():
         return redirect("/login")  # 重定向到密码重置页面
     # 验证完了
     people = Person.query.filter_by(id=id).first()  # 获取用户信息
-    class_names = people.classes.split(", ") if people.classes else []  # 获取用户班级名称
-    html = Html_index(people, class_names)
+    html = Html_index(people)
     return html.get_html()  # 返回主页
+
+
+# 反馈页面
+@app.route("/feedback", methods=["GET", "POST"])
+def feedback():
+    if "id" not in session:  # 如果用户未登录
+        return redirect("/login")  # 重定向到登录页面
+    people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
+    if request.method == "POST":
+        content = request.form["content"]
+        if not content:
+            err = Html_Error("内容不能为空", '内容不能为空<a href="/feedback">返回反馈</a>')  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
+        with open("data/feedback.txt", "a", encoding="utf-8") as f:
+            f.write(people.name + ":" + content + "\n")  # 写入文件
+    else:
+        page = """<textarea class="feedback-input" type="text" name="content" placeholder="请输入反馈内容"></textarea>
+        <button type="submit" class="btn">提交</button>"""
+        html = Html_index(people, page)
+        return html.get_html()  # 返回反馈页面
+
+
+# 个人信息
+@app.route("/user", methods=["GET", "POST"])
+def user():
+    # 验证合法性
+    id = request.cookies.get("id")  # 从 URL 中获取用户 ID
+    key = request.cookies.get("key")  # 从 URL 中获取登录密钥
+    if not id or not key:
+        return redirect("/login")  # 重定向到登录页面
+    if generate_login_key(id) != key:  # 如果登录密钥不正确
+        return redirect("/login")  # 重定向到登录页面
+    if "id" not in session:  # 如果用户未登录
+        return redirect("/login")  # 重定向到登录页面
+    if session["id"] != id:  # 如果用户 ID 不匹配
+        return redirect("/register2")
+    if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
+        return redirect("/login")  # 重定向到密码重置页面
+    # 验证完了
+    people = Person.query.filter_by(id=id).first()  # 获取用户信息
+    html = Html_index(people)
+    return html.get_user_html()  # 返回个人信息页面
+
+
+@app.route("/update_schedule", methods=["GET", "POST"])
+def update_schedule():
+    # 验证合法性
+    id = request.cookies.get("id")  # 从 URL 中获取用户 ID
+    key = request.cookies.get("key")  # 从 URL 中获取登录密钥
+    if not id or not key:
+        return redirect("/login")  # 重定向到登录页面
+    if generate_login_key(id) != key:  # 如果登录密钥不正确
+        return redirect("/login")  # 重定向到登录页面
+    if "id" not in session:  # 如果用户未登录
+        return redirect("/login")  # 重定向到登录页面
+    if session["id"] != id:  # 如果用户 ID 不匹配
+        return redirect("/register2")
+    if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
+        return redirect("/login")  # 重定向到密码重置页面
+    # 验证完了
+    people = Person.query.filter_by(id=id).first()  # 获取用户信息
+    if request.method == "POST":
+        ALLOWED_EXTENSIONS = ["xls"]
+        file = request.files["file"]
+        if file and "." in file.filename and file.filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS:
+            filename = file.filename
+            people.courses = parse_xls(file.read().decode("utf-8"))
+            db.session.commit()  # 提交数据库更改
+            html = Html_index(people, f"<h2>文件{filename}上传成功</h2>")
+            return html.get_html()
+        err = Html_Error("文件类型不支持", "请上传xls格式的文件")
+        return err.get_html()
+    widget = open("templates/upload.html", "r", encoding="utf-8").read()
+    html = Html_index(people, widget)
+    return html.get_html()
+
+
+@app.route("/test", methods=["GET", "POST"])
+def test():
+    return render_template("index2.html")
 
 
 # 图标路由
@@ -128,7 +209,6 @@ def reset2():
             person = Person.query.filter_by(id=id).first()
             person.username = username  # 更新用户名
             person.password = password  # 更新密码
-            db.session.commit()  # 提交数据库更改
             session.pop("verify_code", None)  # 从会话中移除验证码
             person.ips = ""  # 清空 IP 地址列表
             db.session.commit()  # 提交数据库更改
@@ -211,7 +291,7 @@ def register2():
             login_ip = request.remote_addr  # 获取登录 IP 地址
             if person.login_ip(login_ip):
                 send_warning(person.email, person.name, login_ip)  # 发送警告邮件
-            session["id"] = id  # 将用户 ID 存储在会话中
+            session["id"] = person.id  # 将用户 ID 存储在会话中
             return resp
         else:
             err = Html_Error("验证码错误", '验证码错误<a href="/register2">返回注册</a>')  # 显示错误信息
@@ -285,7 +365,7 @@ def delete():
         resp.set_cookie("key", "", expires=0)  # 清除登录密钥作为 cookie
         return resp  # 返回修改后的响应对象
     else:
-        err = Html_Error("确认删除账户吗？", '再问你一遍,确认删除账户吗？<form method="post"><input type="submit" value="确认"></form>')  # 显示确认删除账户信息页面
+        err = Html_Error("确认删除账户吗？", '再问你一遍,确认删除账户吗？<form method="post"><input class="btn type="submit" value="确认"></form>')  # 显示确认删除账户信息页面
         return err.get_html()  # 返回确认删除账户信息页面
 
 
@@ -294,16 +374,15 @@ def handle_error(e):
     # 使用traceback格式化错误信息
     tb_lines = traceback.format_exception(type(e), e, e.__traceback__)  # 正确用位置参数
     for n, line in enumerate(tb_lines):
-        print(n, line)
         if "web_server" in line:
             tb_lines = tb_lines[n:]
             break
-        # if "werkzeug" in line:
-        #    tb_lines = ["None"]
+        if "werkzeug" in line:
+            tb_lines = [""]
     tb_message = "".join(tb_lines)  # 错误信息
     if "(535, b'Error: authentication failed')" == str(e):
         tb_message = "邮件授权到期,请联系管理员"
-    err = Html_Error(f"{type(e).__name__}", f"错误：{str(e)}<br>信息：<pre>{tb_message}</pre>")  # 显示错误信息
+    err = Html_Error(f"{type(e).__name__}", f"错误：{str(e)}<br>信息：<div>{tb_message.replace('\n', '<br>')}</div>")  # 显示错误信息
     return err.get_html()  # 返回错误信息页面
 
 
