@@ -382,7 +382,8 @@ def handle_error(e):
     tb_message = "".join(tb_lines)  # 错误信息
     if "(535, b'Error: authentication failed')" == str(e):
         tb_message = "邮件授权到期,请联系管理员"
-    err = Html_Error(f"{type(e).__name__}", f"错误：{str(e)}<br>信息：<div>{tb_message.replace('\n', '<br>')}</div>")  # 显示错误信息
+    tb_message = tb_message.replace("\n", "<br>")
+    err = Html_Error(f"{type(e).__name__}", f"错误：{str(e)}<br>信息：<div>{tb_message}</div>")  # 显示错误信息
     return err.get_html()  # 返回错误信息页面
 
 

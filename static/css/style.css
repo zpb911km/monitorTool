@@ -134,7 +134,7 @@ a {
 
 .content {
     width: 80%;
-    height: 95%;
+    height: 95vh;
     background-color: #000000;
     color: rgb(255, 255, 255);
     overflow-y: auto;

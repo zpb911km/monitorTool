@@ -30,6 +30,55 @@ class Person(db.Model):
         db.session.commit()
         return warn
 
+    def format_courses(self) -> str:
+        full = []
+        if self.courses is None:
+            return ""
+        for course_id in self.courses.split(",")[:-1]:
+            course = Course.query.filter_by(id=course_id).first()
+            if course is None:
+                raise Exception("数据库冲突，请联系管理员")
+            if len(full) == 0:
+                full = course.format_course()
+            else:
+                full = merge_list(full, course.format_course())
+        widget = ""
+        for w in range(20):
+            widget += "第" + str(w + 1) + "周<br />" + '<table border="1">'
+            widget += '<tr><th width="14.2857142857%">星期日</th><th width="14.2857142857%">星期一</th><th width="14.2857142857%">星期二</th><th width="14.2857142857%">星期三</th><th width="14.2857142857%">星期四</th><th width="14.2857142857%">星期五</th><th width="14.2857142857%">星期六</th></tr>'
+
+            for n in range(6):
+                widget += '<tr height="50px">'
+                for d in range(7):
+                    widget += "<td>"
+                    if full[w][d][n] == "":
+                        widget += f"""
+                                    <form action="/user/add_course" method="post">
+                                        <input class="class-input" type="hidden" name="week" value="{w}">
+                                        <input class="class-input" type="hidden" name="weekday" value="{d}">
+                                        <input class="class-input" type="hidden" name="number" value="{n}">
+                                        <input class="class-input" type="text" name="id" placeholder="课程id">
+                                        <input class="class-input" type="text" name="name" placeholder="课程名">
+                                        <input class="class-input" type="text" name="teacher" placeholder="教师">
+                                        <input class="class-input" type="text" name="location" placeholder="上课地点">
+                                        <br />
+                                        <input class="class-btn" type="submit" value="添加">
+                                    </form>
+                                """
+                    else:
+                        widget += f"{full[w][d][n]}"
+                        widget += f'<br /><button class="class-delete-btn" onclick="window.location.href=\'/user/delete_course?id={self.id}&course_id={full[w][d][n]}\';">删除</a>'
+                    widget += "</td>"
+                widget += "</tr>"
+            widget += "</table><br />"
+        replace_dict = {}
+        for course_id in self.courses.split(",")[:-1]:
+            course = Course.query.filter_by(id=course_id).first()
+            replace_dict[course_id] = course.name + "<br />" + course.teacher + "<br />"
+        for key, value in replace_dict.items():
+            widget = widget.replace(key, value)
+        return widget
+
 
 class Course(db.Model):
     __tablename__ = "courses"
@@ -47,9 +96,22 @@ class Course(db.Model):
         else:
             if course.name != name or course.teacher != teacher:
                 return False
-            course.courcations += courcations + ","
+            if courcations not in course.courcations.split(","):
+                course.courcations += courcations + ","
         db.session.commit()
         return True
+
+    def format_course(self) -> list:
+        out = []
+        for courcation_id in self.courcations.split(",")[:-1]:
+            courcation = Courcation.query.filter_by(id=courcation_id).first()
+            if courcation is None:
+                continue
+            if len(out) == 0:
+                out = courcation.format_courcation()
+            else:
+                out = merge_list(out, courcation.format_courcation())
+        return out
 
 
 class Courcation(db.Model):
@@ -68,6 +130,17 @@ class Courcation(db.Model):
             courcation.location = location
             courcation.time_tables = time_tables
         db.session.commit()
+
+    def format_courcation(self) -> list:
+        out = [[[""] * 6 for _ in range(7)] for _ in range(20)]
+        times = self.time_tables.split(",")
+        for w in range(20):
+            for d in range(7):
+                for n in range(6):
+                    time = f"{w}|{d}|{n}"
+                    if time in times:
+                        out[w][d][n] = f"{self.id}"
+        return out
 
 
 class Class(db.Model):
@@ -114,6 +187,7 @@ class Html_index:
     def get_user_html(self) -> str:
         main_area = open("./templates/userinfo.html", "r", encoding="utf-8").read()
         main_area = main_area.replace("<!--username-->", self.user.username)
+        main_area = main_area.replace("<!--table-->", self.user.format_courses())
         self.main_area = main_area
         return self.get_html()
 
@@ -255,8 +329,12 @@ def parse_xls(file_content: str) -> str:
                 course_ids += parse_course(course_list[2 * n][d + 1].strip(), d, n) + ","
             except AttributeError:
                 pass
-    print(course_ids)
-    return course_ids
+    ids = ""
+    for course_id in course_ids.split(",")[:-1]:
+        if course_id in ids.split(","):
+            continue
+        ids += course_id + ","
+    return ids
 
 
 def parse_course(source_t: str, weekday: int, number: int) -> str:
@@ -280,25 +358,53 @@ def parse_course(source_t: str, weekday: int, number: int) -> str:
     for weekp in time.split(","):
         if "-" in weekp and ("单" in weekp or "双" in weekp):
             for w in range(int(weekp.split("-")[0]), int(weekp.split("-")[1].split("单")[0].split("双")[0]) + 1, 2):
-                weeks.append(w)
+                weeks.append(w - 1)
         elif "-" in weekp and "单" not in weekp and "双" not in weekp:
             for w in range(int(weekp.split("-")[0]), int(weekp.split("-")[1]) + 1):
-                weeks.append(w)
+                weeks.append(w - 1)
         else:
-            weeks.append(int(weekp))
+            weeks.append(int(weekp) - 1)
     location = string.replace("(" + time + " ", "").strip()[:-1]
-    print(name)
-    print(id)
-    print(teacher)
-    print(weeks)
-    print(location)
+    # print(name)
+    # print(id)
+    # print(teacher)
+    # print(weeks)
+    # print(location)
     courcation_id = id + location
     courcation_location = location
-    courcation_time_tables = ""
+    Courcation.query.filter_by(id=courcation_id).first()
+    if Courcation.query.filter_by(id=courcation_id).first() is None:
+        courcation_time_tables = ""
+    else:
+        courcation_time_tables = Courcation.query.filter_by(id=courcation_id).first().time_tables
     for week in weeks:
         courcation_time_tables += f"{week}|{weekday}|{number},"
-    courcation_time_tables = courcation_time_tables[:-1]
+    courcation_time_tables = courcation_time_tables
     Courcation.update(courcation_id, courcation_location, courcation_time_tables)
     while not Course.update(id, name, teacher, courcation_id):
         id += "+"
     return id
+
+
+def merge_list(*lists) -> list:
+    """合并多个整数维度列表。
+    0维列表就是元素相加"""
+    if not isinstance(lists[0], list):
+        out = lists[0]
+        for l in lists[1:]:
+            if out is None:
+                out = l
+            else:
+                out += l
+        return out
+    out = []
+    length = -1
+    for l in lists:
+        if len(l) != length and length != -1:
+            raise ValueError("列表长度不一致")
+        length = len(l)
+        if len(out) == 0:
+            out = [None for _ in range(length)]
+        for n, item in enumerate(l):
+            out[n] = merge_list(out[n], item)
+    return out
