@@ -7,6 +7,9 @@ import pandas as pd
 from flask import render_template
 
 
+SPLITER = "(A"
+
+
 class Person(db.Model):
     __tablename__ = "persons"
 
@@ -44,7 +47,7 @@ class Person(db.Model):
                 full = merge_list(full, course.format_course())
         widget = ""
         for w in range(20):
-            widget += "第" + str(w + 1) + "周<br />" + '<table border="1">'
+            widget += "第" + str(w + 1) + "周<br />" + '<table border="1" width="100%">'
             widget += '<tr><th width="14.2857142857%">星期日</th><th width="14.2857142857%">星期一</th><th width="14.2857142857%">星期二</th><th width="14.2857142857%">星期三</th><th width="14.2857142857%">星期四</th><th width="14.2857142857%">星期五</th><th width="14.2857142857%">星期六</th></tr>'
 
             for n in range(6):
@@ -52,22 +55,9 @@ class Person(db.Model):
                 for d in range(7):
                     widget += "<td>"
                     if full[w][d][n] == "":
-                        widget += f"""
-                                    <form action="/user/add_course" method="post">
-                                        <input class="class-input" type="hidden" name="week" value="{w}">
-                                        <input class="class-input" type="hidden" name="weekday" value="{d}">
-                                        <input class="class-input" type="hidden" name="number" value="{n}">
-                                        <input class="class-input" type="text" name="id" placeholder="课程id">
-                                        <input class="class-input" type="text" name="name" placeholder="课程名">
-                                        <input class="class-input" type="text" name="teacher" placeholder="教师">
-                                        <input class="class-input" type="text" name="location" placeholder="上课地点">
-                                        <br />
-                                        <input class="class-btn" type="submit" value="添加">
-                                    </form>
-                                """
+                        widget += ""
                     else:
                         widget += f"{full[w][d][n]}"
-                        widget += f'<br /><button class="class-delete-btn" onclick="window.location.href=\'/user/delete_course?id={self.id}&course_id={full[w][d][n]}\';">删除</a>'
                     widget += "</td>"
                 widget += "</tr>"
             widget += "</table><br />"
@@ -95,8 +85,11 @@ class Course(db.Model):
             db.session.add(course)
         else:
             if course.name != name or course.teacher != teacher:
-                return False
+                if course.name != "" or course.teacher != "":
+                    return False
             if courcations not in course.courcations.split(","):
+                course.name = name
+                course.teacher = teacher
                 course.courcations += courcations + ","
         db.session.commit()
         return True
@@ -151,6 +144,41 @@ class Class(db.Model):
     administrators = db.Column(db.Text)  # 以逗号分隔的管理员 ID 字符串
     students = db.Column(db.Text)  # 以逗号分隔的学生 ID 字符串
     notifications = db.Column(db.Text)  # 以逗号分隔的通知 ID 字符串
+    unsynced_peoples = db.Column(db.Text)  # 以逗号分隔的未同步人员 ID 字符串
+
+    def sync_to_people(self) -> None:
+        ids = self.unsynced_peoples.split(",")
+        for id in ids:
+            person = Person.query.filter_by(id=id).first()
+            if person is None:
+                continue
+            else:
+                person.classes += f"{self.id},"
+                ids.remove(id)
+        self.unsynced_peoples = ",".join(ids)
+        db.session.commit()
+
+    def new(id: str, name: str, administrators: list[str], students: list[str]) -> bool:
+        admins = ",".join([admin_in.split(" ")[1] for admin_in in administrators if admin_in != ""])
+        members = ",".join([member_in.split(" ")[1] for member_in in students if member_in != ""])
+        unsynced = []
+        for admin in admins.split(","):
+            person = Person.query.filter_by(username=admin).first()
+            if person is not None:
+                person.classes += f"{id},"
+            else:
+                unsynced.append(admin)
+        for member in members.split(","):
+            person = Person.query.filter_by(username=member).first()
+            if person is not None:
+                person.classes += f"{id},"
+            else:
+                unsynced.append(member)
+        unsynced_peoples = ",".join(unsynced)
+        class_ = Class(id=id, name=name, administrators=admins, students=members, notifications="", unsynced_peoples=unsynced_peoples)
+        db.session.add(class_)
+        db.session.commit()
+        return True
 
 
 class Notification(db.Model):
@@ -294,6 +322,26 @@ def is_valid_username(username: str) -> bool:
     return re.match(pattern, username) is not None
 
 
+def is_valid_input_str(input_str: str) -> bool:
+    """验证输入字符串是否合法。
+    输入字符串不能包含非法字符，特别是HTML和MySQL中可能被用于攻击的字符。
+
+    参数:
+        input_str (str): 要验证的输入字符串。
+
+    返回:
+        bool: 如果输入字符串格式合法，返回 True；否则返回 False。
+    """
+    # 定义非法字符
+    illegal_characters = r"[<>'\";()&%$#@!\\\[\]{}=`~]+"
+
+    # 检查是否包含非法字符
+    if re.search(illegal_characters, input_str):
+        return False
+
+    return True
+
+
 def is_valid_password(password: str) -> bool:
     """验证密码格式是否合法。
     长度：密码长度必须在8到20个字符之间。
@@ -311,7 +359,7 @@ def is_valid_password(password: str) -> bool:
     return re.match(pattern, password) is not None
 
 
-def parse_xls(file_content: str) -> str:
+def parse_xls(file_content: str, is_gbk=False) -> str:
     """解析 Excel 文件内容。
 
     参数:
@@ -320,13 +368,34 @@ def parse_xls(file_content: str) -> str:
     返回:
 
     """
+    all_ids = []
+    lst = file_content.split(SPLITER)
+    for li in lst:
+        try:
+            int(li[0])
+            if "A" + li.split(")")[0] not in all_ids:
+                all_ids.append("A" + li.split(")")[0])
+        except ValueError:
+            pass
+    for id in all_ids:
+        course = Course.query.filter_by(id=id).first()
+        if course is not None:
+            course.name = ""
+            course.teacher = ""
+            for courcation_id in course.courcations.split(","):
+                courcation = Courcation.query.filter_by(id=courcation_id).first()
+                if courcation is not None:
+                    courcation.location = ""
+                    courcation.time_tables = ""
+            course.courcations = ""
+            db.session.commit()
     course_list = pd.read_html(file_content)[-2].values.tolist()
     course_ids = ""
     for n in range(6):
         for d in range(7):
             try:
                 # print(course_list[2 * n][d + 1].strip(), d, n)
-                course_ids += parse_course(course_list[2 * n][d + 1].strip(), d, n) + ","
+                course_ids += parse_course(course_list[2 * n][d + 1].strip(), d, n, is_gbk) + ","
             except AttributeError:
                 pass
     ids = ""
@@ -337,15 +406,16 @@ def parse_xls(file_content: str) -> str:
     return ids
 
 
-def parse_course(source_t: str, weekday: int, number: int) -> str:
+def parse_course(source_t: str, weekday: int, number: int, is_gbk=False) -> str:
+    source_t = source_t.replace("校区))", "校区)").replace("校区)", "校区))")
     if len(source_t.split(")) ")) > 1:
         out = ""
         for t in source_t.split(")) ")[:-1]:
-            out += parse_course((t + "))").strip(), weekday, number) + ","
-        out += parse_course(source_t.split(")) ")[-1].strip(), weekday, number)
+            out += parse_course((t + "))").strip(), weekday, number, is_gbk) + ","
+        out += parse_course(source_t.split(")) ")[-1].strip(), weekday, number, is_gbk)
         return out
     string = source_t.strip()
-    name = string.split(" ")[0]
+    name = string.split(SPLITER)[0].strip()
     string = string.replace(name, "").strip()
     id = string.split(" ")[0]
     string = string.replace(id, "").strip()
@@ -353,7 +423,9 @@ def parse_course(source_t: str, weekday: int, number: int) -> str:
     teacher = string.split(" ")[0]
     string = string.replace(teacher, "").strip()
     teacher = teacher.replace("(", "").replace(")", "")
-    time = string.split(" ")[0].replace("(", "")
+    if is_gbk:
+        string = string.replace(",", "`").replace(" ", ",").replace("`", " ")
+    time = string.split(" ")[0].replace("(", "").replace(")", "")
     weeks = []
     for weekp in time.split(","):
         if "-" in weekp and ("单" in weekp or "双" in weekp):
@@ -391,20 +463,20 @@ def merge_list(*lists) -> list:
     0维列表就是元素相加"""
     if not isinstance(lists[0], list):
         out = lists[0]
-        for l in lists[1:]:
+        for li in lists[1:]:
             if out is None:
-                out = l
+                out = li
             else:
-                out += l
+                out += li
         return out
     out = []
     length = -1
-    for l in lists:
-        if len(l) != length and length != -1:
+    for li in lists:
+        if len(li) != length and length != -1:
             raise ValueError("列表长度不一致")
-        length = len(l)
+        length = len(li)
         if len(out) == 0:
             out = [None for _ in range(length)]
-        for n, item in enumerate(l):
+        for n, item in enumerate(li):
             out[n] = merge_list(out[n], item)
     return out

@@ -2,7 +2,7 @@ from flask import Flask, render_template, session, redirect, url_for, request, m
 from flask_sqlalchemy import SQLAlchemy
 import random
 from init import app, db
-from core import Person, Html_Error, Html_index, send_verify, send_warning, is_valid_email, is_valid_username, is_valid_password, parse_xls
+from core import Person, Class, Html_Error, Html_index, send_verify, send_warning, is_valid_email, is_valid_username, is_valid_password, parse_xls, is_valid_input_str
 import traceback
 import os
 from time import sleep
@@ -46,6 +46,49 @@ def home():
     return html.get_html()  # 返回主页
 
 
+@app.route("/create_class", methods=["GET", "POST"])
+def create_class():
+    # 验证合法性
+    id = request.cookies.get("id")  # 从 URL 中获取用户 ID
+    key = request.cookies.get("key")  # 从 URL 中获取登录密钥
+    if not id or not key:
+        return redirect("/login")  # 重定向到登录页面
+    if generate_login_key(id) != key:  # 如果登录密钥不正确
+        return redirect("/login")  # 重定向到登录页面
+    if "id" not in session:  # 如果用户未登录
+        return redirect("/login")  # 重定向到登录页面
+    if session["id"] != id:  # 如果用户 ID 不匹配
+        return redirect("/login")  # 重定向到登录页面
+    if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
+        return redirect("/login")  # 重定向到密码重置页面
+    # 验证完了
+    people = Person.query.filter_by(id=id).first()  # 获取用户信息
+    if request.method == "POST":
+        class_name = request.form["class_name"]
+        members = request.form["members"]
+        administators = request.form["administators"]
+        if is_valid_input_str(class_name) and is_valid_input_str(members) and is_valid_input_str(administators):
+            pass
+        else:
+            err = Html_Error("输入错误", '含有非法字符<a href="/create_class">返回创建课程</a>')  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
+        if not class_name or not members or not administators:
+            err = Html_Error("不能为空", '课程名称与成员与管理员均不能为空<a href="/create_class">返回创建课程</a>')  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
+        class_id = random.randint(100000, 999999)  # 生成随机课程 ID
+        while Person.query.filter_by(class_id=class_id).first():  # 防止 ID 重复
+            class_id = class_id + 1
+        class_members = members.split("\n")
+        class_administators = administators.split("\n")
+        for member in class_members:
+            if member in class_administators:
+                class_members.remove(member)
+        Class.new(class_id, class_name, class_administators, class_members)
+    widget = open("templates/create_class.html", "r", encoding="utf-8").read()
+    html = Html_index(people, widget)
+    return html.get_html()  # 返回创建课程页面
+
+
 # 反馈页面
 @app.route("/feedback", methods=["GET", "POST"])
 def feedback():
@@ -61,7 +104,7 @@ def feedback():
             f.write(people.name + ":" + content + "\n")  # 写入文件
     else:
         page = """<textarea class="feedback-input" type="text" name="content" placeholder="请输入反馈内容"></textarea>
-        <button type="submit" class="btn">提交</button>"""
+        <button type="submit" class="btn">提交</button><script>alert("感谢您的反馈,我们会尽快处理")</script>"""
         html = Html_index(people, page)
         return html.get_html()  # 返回反馈页面
 
@@ -109,13 +152,20 @@ def update_schedule():
         ALLOWED_EXTENSIONS = ["xls"]
         file = request.files["file"]
         if file and "." in file.filename and file.filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS:
-            filename = file.filename
-            people.courses = parse_xls(file.read().decode("utf-8"))
+            file = file.read()
+            try:
+                content = file.decode("utf-8")
+                # people.courses = parse_xls(content, False)
+                err = Html_Error("文件选择错误", "请在教务处网页课表的右上角先选择打印,再选择导出.<br />(如果先选择导出,则无法进行解析)")
+                return err.get_html()  # 返回错误信息页面
+            except UnicodeDecodeError:
+                content = file.decode("gbk")
+                people.courses = parse_xls(content, True)
             db.session.commit()  # 提交数据库更改
-            html = Html_index(people, f"<h2>文件{filename}上传成功</h2>")
-            return html.get_html()
-        err = Html_Error("文件类型不支持", "请上传xls格式的文件")
-        return err.get_html()
+            return redirect("/user")  # 重定向到个人信息页面
+        else:
+            err = Html_Error("??!", "请上传xls格式的文件,你的信息将不会被保存.")
+            return err.get_html()
     widget = open("templates/upload.html", "r", encoding="utf-8").read()
     html = Html_index(people, widget)
     return html.get_html()
