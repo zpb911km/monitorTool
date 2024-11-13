@@ -69,6 +69,16 @@ class Person(db.Model):
             widget = widget.replace(key, value)
         return widget
 
+    def clean_classes(self) -> None:
+        ids = self.classes.split(",")
+        id_useful = []
+        for id in ids:
+            class_ = Class.query.filter_by(id=id).first()
+            if class_ is not None and id not in id_useful:
+                id_useful.append(id)
+        self.classes = ",".join(id_useful) + ","
+        db.session.commit()
+
 
 class Course(db.Model):
     __tablename__ = "courses"
@@ -148,19 +158,26 @@ class Class(db.Model):
 
     def sync_to_people(self) -> None:
         ids = self.unsynced_peoples.split(",")
+        id_done = []
         for id in ids:
             person = Person.query.filter_by(id=id).first()
             if person is None:
                 continue
             else:
-                person.classes += f"{self.id},"
-                ids.remove(id)
+                if person.classes is None:
+                    person.classes = f"{self.id},"
+                else:
+                    if self.id not in person.classes.split(","):
+                        person.classes += f"{self.id},"
+                id_done.append(id)
+        for id in id_done:
+            ids.remove(id)
         self.unsynced_peoples = ",".join(ids)
         db.session.commit()
 
     def new(id: str, name: str, administrators: list[str], students: list[str]) -> bool:
-        admins = ",".join([admin_in.split(" ")[1] for admin_in in administrators if admin_in != ""])
-        members = ",".join([member_in.split(" ")[1] for member_in in students if member_in != ""])
+        admins = ",".join([admin_in.split(" ")[1].strip() for admin_in in administrators if admin_in != ""])
+        members = ",".join([member_in.split(" ")[1].strip() for member_in in students if member_in != ""])
         unsynced = []
         for admin in admins.split(","):
             person = Person.query.filter_by(username=admin).first()
@@ -176,6 +193,7 @@ class Class(db.Model):
                 unsynced.append(member)
         unsynced_peoples = ",".join(unsynced)
         class_ = Class(id=id, name=name, administrators=admins, students=members, notifications="", unsynced_peoples=unsynced_peoples)
+        class_.sync_to_people()
         db.session.add(class_)
         db.session.commit()
         return True
@@ -195,16 +213,23 @@ class Notification(db.Model):
 class Html_index:
     def __init__(self, user: Person, main_area: str = "") -> None:
         self.user = user
-        self.class_names = user.classes.split(", ") if user.classes is not None else []
+        self.classes = []  # 初始化一个空列表，用于存储班级名称
+        if user.classes is not None:  # 检查用户的班级信息是否存在
+            class_ids = user.classes.split(",")  # 将班级 ID 字符串按逗号分割成列表
+            for class_id in class_ids:  # 遍历班级 ID 列表
+                class_ = Class.query.filter_by(id=class_id).first()  # 查询班级信息
+                if class_ is not None:  # 检查班级是否存在
+                    self.classes.append(class_)
         self.main_area = main_area
 
     def get_html(self) -> str:
+        self.user.clean_classes()
         html = open("./templates/index.html", "r", encoding="utf-8").read()
         link = f'<a href="/user">{self.user.username}</a>'
         html = html.replace("<!--name-->", link)
         links = ""
-        for class_name in self.class_names:
-            links += f'<li>\n<button class="sidebar-button" onclick="location.href=\'/class/{class_name}\'">{class_name}</button>\n</li>\n'
+        for class_ in self.classes:
+            links += f'<li>\n<button class="sidebar-button" onclick="location.href=\'/class/{class_.id}\'">{class_.name}</button>\n</li>\n'
         html = html.replace("<!--Class List-->", links)
         html = html.replace("<!--Content-->", self.main_area)
         return html

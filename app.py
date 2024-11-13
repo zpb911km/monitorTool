@@ -41,9 +41,36 @@ def home():
     if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
         return redirect("/login")  # 重定向到密码重置页面
     # 验证完了
+    for class_ in Class.query.all():  # 更新课程信息
+        class_.sync_to_people()
     people = Person.query.filter_by(id=id).first()  # 获取用户信息
     html = Html_index(people)
     return html.get_html()  # 返回主页
+
+
+@app.route("/class/<int:class_id>", methods=["GET", "POST"])
+def class_page(class_id):
+    # 验证合法性
+    id = request.cookies.get("id")  # 从 URL 中获取用户 ID
+    key = request.cookies.get("key")  # 从 URL 中获取登录密钥
+    if not id or not key:
+        return redirect("/login")  # 重定向到登录页面
+    if generate_login_key(id) != key:  # 如果登录密钥不正确
+        return redirect("/login")  # 重定向到登录页面
+    if "id" not in session:  # 如果用户未登录
+        return redirect("/login")  # 重定向到登录页面
+    if session["id"] != id:  # 如果用户 ID 不匹配
+        return redirect("/login")  # 重定向到登录页面
+    if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
+        return redirect("/login")  # 重定向到密码重置页面
+    # 验证完了
+    people = Person.query.filter_by(id=id).first()  # 获取用户信息
+    class_ = Class.query.filter_by(id=class_id).first()  # 获取课程信息
+    if not class_:
+        err = Html_Error("课程不存在", '课程不存在<a href="/">返回主页</a>')  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    html = Html_index(people, class_.id)
+    return html.get_html()  # 返回课程页面
 
 
 @app.route("/create_class", methods=["GET", "POST"])
@@ -76,13 +103,16 @@ def create_class():
             err = Html_Error("不能为空", '课程名称与成员与管理员均不能为空<a href="/create_class">返回创建课程</a>')  # 显示错误信息
             return err.get_html()  # 返回错误信息页面
         class_id = random.randint(100000, 999999)  # 生成随机课程 ID
-        while Person.query.filter_by(class_id=class_id).first():  # 防止 ID 重复
+        while Class.query.filter_by(id=class_id).first():  # 防止 ID 重复
             class_id = class_id + 1
         class_members = members.split("\n")
         class_administators = administators.split("\n")
+        member_remove = []
         for member in class_members:
             if member in class_administators:
-                class_members.remove(member)
+                member_remove.append(member)
+        for member in member_remove:
+            class_members.remove(member)
         Class.new(class_id, class_name, class_administators, class_members)
     widget = open("templates/create_class.html", "r", encoding="utf-8").read()
     html = Html_index(people, widget)
