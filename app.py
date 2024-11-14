@@ -6,6 +6,7 @@ from core import Person, Class, Html_Error, Html_index, send_verify, send_warnin
 import traceback
 import os
 from time import sleep
+from functools import wraps
 
 en_key = ""  # 加密密钥
 
@@ -24,72 +25,96 @@ def create_tables():
 exec(open("data/en_key", "r", encoding="utf-8").read())  # 导入加密密钥
 
 
+def if_login(func):
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        # 验证合法性
+        id = request.cookies.get("id")  # 从 URL 中获取用户 ID
+        key = request.cookies.get("key")  # 从 URL 中获取登录密钥
+        if not id or not key:
+            return redirect("/login")  # 重定向到登录页面
+        if generate_login_key(id) != key:  # 如果登录密钥不正确
+            return redirect("/login")  # 重定向到登录页面
+        if "id" not in session:  # 如果用户未登录
+            return redirect("/login")  # 重定向到登录页面
+        if session["id"] != id:  # 如果用户 ID 不匹配
+            return redirect("/login")  # 重定向到登录页面
+        if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
+            return redirect("/login")  # 重定向到密码重置页面
+        # 验证完了
+        return func(*args, **kwargs)  # 调用被修饰的函数
+
+    return decorated_function
+
+
 # 定义根路由
 @app.route("/")
+@if_login
 def home():
-    # 验证合法性
-    id = request.cookies.get("id")  # 从 URL 中获取用户 ID
-    key = request.cookies.get("key")  # 从 URL 中获取登录密钥
-    if not id or not key:
-        return redirect("/login")  # 重定向到登录页面
-    if generate_login_key(id) != key:  # 如果登录密钥不正确
-        return redirect("/login")  # 重定向到登录页面
-    if "id" not in session:  # 如果用户未登录
-        return redirect("/login")  # 重定向到登录页面
-    if session["id"] != id:  # 如果用户 ID 不匹配
-        return redirect("/login")  # 重定向到登录页面
-    if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
-        return redirect("/login")  # 重定向到密码重置页面
-    # 验证完了
     for class_ in Class.query.all():  # 更新课程信息
         class_.sync_to_people()
-    people = Person.query.filter_by(id=id).first()  # 获取用户信息
+    people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
     html = Html_index(people)
     return html.get_html()  # 返回主页
 
 
 @app.route("/class/<int:class_id>", methods=["GET", "POST"])
+@if_login
 def class_page(class_id):
-    # 验证合法性
-    id = request.cookies.get("id")  # 从 URL 中获取用户 ID
-    key = request.cookies.get("key")  # 从 URL 中获取登录密钥
-    if not id or not key:
-        return redirect("/login")  # 重定向到登录页面
-    if generate_login_key(id) != key:  # 如果登录密钥不正确
-        return redirect("/login")  # 重定向到登录页面
-    if "id" not in session:  # 如果用户未登录
-        return redirect("/login")  # 重定向到登录页面
-    if session["id"] != id:  # 如果用户 ID 不匹配
-        return redirect("/login")  # 重定向到登录页面
-    if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
-        return redirect("/login")  # 重定向到密码重置页面
-    # 验证完了
-    people = Person.query.filter_by(id=id).first()  # 获取用户信息
+    people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
+    class_ = Class.query.filter_by(id=class_id).first()  # 获取课程信息
+    class_.sync_to_people()
+    if not class_:
+        err = Html_Error("课程不存在", '课程不存在<a href="/">返回主页</a>')  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    if str(people.id) in class_.administrators:
+        # TODO: 移植到core
+        widget = open("templates/class_admin.html", "r", encoding="utf-8").read()
+        widget = widget.replace("<!--class_id-->", class_.id)
+        students = []
+        for student_id in class_.students.split(","):
+            student = Person.query.filter_by(id=student_id).first()
+            if student:
+                students.append(student.name + " " + str(student.id))
+        admins = []
+        for admin_id in class_.administrators.split(","):
+            admin = Person.query.filter_by(id=admin_id).first()
+            if admin:
+                admins.append(admin.name + " " + str(admin.id))
+        widget = widget.replace("<!--admins-->", "\n".join(admins))
+        widget = widget.replace("<!--len_admins-->", str(len(admins)))
+        widget = widget.replace("<!--students-->", "\n".join(students))
+        widget = widget.replace("<!--len_students-->", str(len(students)))
+        widget = widget.replace("<!--confirm_details-->", '<div style="background-color: #0000ff; width: 100%; height: 100%;"></div>')
+        html = Html_index(people, widget)
+        return html.get_html()  # 返回课程管理页面
+    elif str(people.id) in class_.students:
+        widget = open("templates/class_stu.html", "r", encoding="utf-8").read()
+        html = Html_index(people, widget)
+        return html.get_html()  # 返回课程成员页面
+    else:
+        people.classes = people.classes.replace(str(class_id) + ",", "").replace(str(class_id), "")
+        db.session.commit()
+        err = Html_Error("无权限访问", '无权限访问<a href="/">返回主页</a>')  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+
+
+@app.route("/class/<int:class_id>/schedule")
+@if_login
+def class_schedule(class_id):
     class_ = Class.query.filter_by(id=class_id).first()  # 获取课程信息
     if not class_:
         err = Html_Error("课程不存在", '课程不存在<a href="/">返回主页</a>')  # 显示错误信息
         return err.get_html()  # 返回错误信息页面
-    html = Html_index(people, class_.id)
-    return html.get_html()  # 返回课程页面
+    people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
+    html = Html_index(people, class_.schedule_name().replace("\n", "<br />"))
+    return html.get_html()  # 返回课程时间表页面
 
 
 @app.route("/create_class", methods=["GET", "POST"])
+@if_login
 def create_class():
-    # 验证合法性
-    id = request.cookies.get("id")  # 从 URL 中获取用户 ID
-    key = request.cookies.get("key")  # 从 URL 中获取登录密钥
-    if not id or not key:
-        return redirect("/login")  # 重定向到登录页面
-    if generate_login_key(id) != key:  # 如果登录密钥不正确
-        return redirect("/login")  # 重定向到登录页面
-    if "id" not in session:  # 如果用户未登录
-        return redirect("/login")  # 重定向到登录页面
-    if session["id"] != id:  # 如果用户 ID 不匹配
-        return redirect("/login")  # 重定向到登录页面
-    if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
-        return redirect("/login")  # 重定向到密码重置页面
-    # 验证完了
-    people = Person.query.filter_by(id=id).first()  # 获取用户信息
+    people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
     if request.method == "POST":
         class_name = request.form["class_name"]
         members = request.form["members"]
@@ -121,9 +146,8 @@ def create_class():
 
 # 反馈页面
 @app.route("/feedback", methods=["GET", "POST"])
+@if_login
 def feedback():
-    if "id" not in session:  # 如果用户未登录
-        return redirect("/login")  # 重定向到登录页面
     people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
     if request.method == "POST":
         content = request.form["content"]
@@ -141,43 +165,17 @@ def feedback():
 
 # 个人信息
 @app.route("/user", methods=["GET", "POST"])
+@if_login
 def user():
-    # 验证合法性
-    id = request.cookies.get("id")  # 从 URL 中获取用户 ID
-    key = request.cookies.get("key")  # 从 URL 中获取登录密钥
-    if not id or not key:
-        return redirect("/login")  # 重定向到登录页面
-    if generate_login_key(id) != key:  # 如果登录密钥不正确
-        return redirect("/login")  # 重定向到登录页面
-    if "id" not in session:  # 如果用户未登录
-        return redirect("/login")  # 重定向到登录页面
-    if session["id"] != id:  # 如果用户 ID 不匹配
-        return redirect("/register2")
-    if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
-        return redirect("/login")  # 重定向到密码重置页面
-    # 验证完了
-    people = Person.query.filter_by(id=id).first()  # 获取用户信息
+    people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
     html = Html_index(people)
     return html.get_user_html()  # 返回个人信息页面
 
 
 @app.route("/update_schedule", methods=["GET", "POST"])
+@if_login
 def update_schedule():
-    # 验证合法性
-    id = request.cookies.get("id")  # 从 URL 中获取用户 ID
-    key = request.cookies.get("key")  # 从 URL 中获取登录密钥
-    if not id or not key:
-        return redirect("/login")  # 重定向到登录页面
-    if generate_login_key(id) != key:  # 如果登录密钥不正确
-        return redirect("/login")  # 重定向到登录页面
-    if "id" not in session:  # 如果用户未登录
-        return redirect("/login")  # 重定向到登录页面
-    if session["id"] != id:  # 如果用户 ID 不匹配
-        return redirect("/register2")
-    if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
-        return redirect("/login")  # 重定向到密码重置页面
-    # 验证完了
-    people = Person.query.filter_by(id=id).first()  # 获取用户信息
+    people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
     if request.method == "POST":
         ALLOWED_EXTENSIONS = ["xls"]
         file = request.files["file"]
@@ -387,37 +385,23 @@ def register2():
 
 # 用户注销
 @app.route("/logout")
+@if_login
 def logout():
-    if "id" in session:  # 如果已登录
-        session.pop("id", None)  # 从会话中移除用户 ID
-        session.pop("name", None)  # 从会话中移除用户姓名
-        session.pop("email", None)  # 从会话中移除用户邮箱
-        session.pop("verify_code", None)  # 从会话中移除验证码
-        session.pop("username", None)  # 从会话中移除用户名
-        resp = make_response(redirect("/"))  # 创建响应对象并重定向到主页
-        resp.set_cookie("id", "", expires=0)  # 清除登录 ID 作为 cookie
-        resp.set_cookie("key", "", expires=0)  # 清除登录密钥作为 cookie
-
+    session.pop("id", None)  # 从会话中移除用户 ID
+    session.pop("name", None)  # 从会话中移除用户姓名
+    session.pop("email", None)  # 从会话中移除用户邮箱
+    session.pop("verify_code", None)  # 从会话中移除验证码
+    session.pop("username", None)  # 从会话中移除用户名
+    resp = make_response(redirect("/"))  # 创建响应对象并重定向到主页
+    resp.set_cookie("id", "", expires=0)  # 清除登录 ID 作为 cookie
+    resp.set_cookie("key", "", expires=0)  # 清除登录密钥作为 cookie
     return resp  # 返回修改后的响应对象
 
 
 # 删除账户
 @app.route("/delete", methods=["GET", "POST"])
+@if_login
 def delete():
-    # 验证合法性
-    id = request.cookies.get("id")  # 从 URL 中获取用户 ID
-    key = request.cookies.get("key")  # 从 URL 中获取登录密钥
-    if not id or not key:
-        return redirect("/login")  # 重定向到登录页面
-    if generate_login_key(id) != key:  # 如果登录密钥不正确
-        return redirect("/login")  # 重定向到登录页面
-    if "id" not in session:  # 如果用户未登录
-        return redirect("/login")  # 重定向到登录页面
-    if session["id"] != id:  # 如果用户 ID 不匹配
-        return redirect("/login")  # 重定向到登录页面
-    if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
-        return redirect("/login")  # 重定向到密码重置页面
-    # 验证完了
     if request.method == "POST":
         # 再验证合法性
         id = request.cookies.get("id")  # 从 URL 中获取用户 ID

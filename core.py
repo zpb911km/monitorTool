@@ -33,6 +33,58 @@ class Person(db.Model):
         db.session.commit()
         return warn
 
+    def raw_courses_name(self) -> list:
+        full = []
+        if self.courses is None:
+            return ""
+        for course_id in self.courses.split(",")[:-1]:
+            course = Course.query.filter_by(id=course_id).first()
+            if course is None:
+                raise Exception("数据库冲突，请联系管理员")
+            if len(full) == 0:
+                full = course.raw_course()
+            else:
+                full = merge_list(full, course.raw_course())
+        out = []
+        for w in range(20):
+            outd = []
+            for d in range(7):
+                outn = []
+                for n in range(6):
+                    if full[w][d][n] == "":
+                        outn.append("")
+                    else:
+                        outn.append(self.name + "\n")
+                outd.append(outn)
+            out.append(outd)
+        return out
+
+    def raw_courses_count(self) -> list:
+        full = []
+        if self.courses is None:
+            return ""
+        for course_id in self.courses.split(",")[:-1]:
+            course = Course.query.filter_by(id=course_id).first()
+            if course is None:
+                raise Exception("数据库冲突，请联系管理员")
+            if len(full) == 0:
+                full = course.raw_course()
+            else:
+                full = merge_list(full, course.raw_course())
+        out = []
+        for w in range(20):
+            outd = []
+            for d in range(7):
+                outn = []
+                for n in range(6):
+                    if full[w][d][n] == "":
+                        outn.append("")
+                    else:
+                        outn.append(str(len(full[w][d][n])))
+                outd.append(outn)
+            out.append(outd)
+        return out
+
     def format_courses(self) -> str:
         full = []
         if self.courses is None:
@@ -116,6 +168,18 @@ class Course(db.Model):
                 out = merge_list(out, courcation.format_courcation())
         return out
 
+    def raw_course(self) -> list:
+        out = []
+        for courcation_id in self.courcations.split(",")[:-1]:
+            courcation = Courcation.query.filter_by(id=courcation_id).first()
+            if courcation is None:
+                continue
+            if len(out) == 0:
+                out = courcation.raw_courcation()
+            else:
+                out = merge_list(out, courcation.raw_courcation())
+        return out
+
 
 class Courcation(db.Model):
     __tablename__ = "courcations"
@@ -143,6 +207,17 @@ class Courcation(db.Model):
                     time = f"{w}|{d}|{n}"
                     if time in times:
                         out[w][d][n] = f"{self.id}"
+        return out
+
+    def raw_courcation(self) -> list:
+        out = [[[""] * 6 for _ in range(7)] for _ in range(20)]
+        times = self.time_tables.split(",")
+        for w in range(20):
+            for d in range(7):
+                for n in range(6):
+                    time = f"{w}|{d}|{n}"
+                    if time in times:
+                        out[w][d][n] = "1"
         return out
 
 
@@ -173,6 +248,9 @@ class Class(db.Model):
         for id in id_done:
             ids.remove(id)
         self.unsynced_peoples = ",".join(ids)
+        for admin_id in self.administrators.split(","):
+            if admin_id in self.students:
+                self.students = self.students.replace(admin_id + ",", "").replace(admin_id, "")
         db.session.commit()
 
     def new(id: str, name: str, administrators: list[str], students: list[str]) -> bool:
@@ -197,6 +275,78 @@ class Class(db.Model):
         db.session.add(class_)
         db.session.commit()
         return True
+
+    def schedule_name(self) -> str:
+        schedule = []
+        for student_id in self.students.split(","):
+            student = Person.query.filter_by(id=student_id).first()
+            if student is None:
+                continue
+            if len(schedule) == 0:
+                schedule = student.raw_courses_name()
+            else:
+                schedule = merge_list(schedule, student.raw_courses_name())
+        for admin_id in self.administrators.split(","):
+            admin = Person.query.filter_by(id=admin_id).first()
+            if admin is None:
+                continue
+            if len(schedule) == 0:
+                schedule = admin.raw_courses_name()
+            else:
+                schedule = merge_list(schedule, admin.raw_courses_name())
+        widget = ""
+        for w in range(20):
+            widget += "第" + str(w + 1) + "周<br />" + '<table border="1" width="100%">'
+            widget += '<tr><th width="14.2857142857%">星期日</th><th width="14.2857142857%">星期一</th><th width="14.2857142857%">星期二</th><th width="14.2857142857%">星期三</th><th width="14.2857142857%">星期四</th><th width="14.2857142857%">星期五</th><th width="14.2857142857%">星期六</th></tr>'
+
+            for n in range(6):
+                widget += '<tr height="50px">'
+                for d in range(7):
+                    widget += "<td>"
+                    if schedule[w][d][n] == "":
+                        widget += ""
+                    else:
+                        widget += f"{schedule[w][d][n]}"
+                    widget += "</td>"
+                widget += "</tr>"
+            widget += "</table><br />"
+        return widget
+
+    def schedule_count(self) -> str:
+        schedule = []
+        for student_id in self.students.split(","):
+            student = Person.query.filter_by(id=student_id).first()
+            if student is None:
+                continue
+            if len(schedule) == 0:
+                schedule = student.raw_courses_count()
+            else:
+                schedule = merge_list(schedule, student.raw_courses_count())
+        for admin_id in self.administrators.split(","):
+            admin = Person.query.filter_by(id=admin_id).first()
+            if admin is None:
+                continue
+            if len(schedule) == 0:
+                schedule = admin.raw_courses_count()
+            else:
+                schedule = merge_list(schedule, admin.raw_courses_count())
+        widget = ""
+        for w in range(20):
+            widget += "第" + str(w + 1) + "周<br />" + '<table border="1" width="100%">'
+            widget += '<tr><th width="14.2857142857%">星期日</th><th width="14.2857142857%">星期一</th><th width="14.2857142857%">星期二</th><th width="14.2857142857%">星期三</th><th width="14.2857142857%">星期四</th><th width="14.2857142857%">星期五</th><th width="14.2857142857%">星期六</th></tr>'
+
+            for n in range(6):
+                widget += '<tr height="50px">'
+                for d in range(7):
+                    widget += "<td>"
+                    if schedule[w][d][n] == "":
+                        widget += ""
+                    else:
+                        widget += f"{schedule[w][d][n]}"
+                    widget += "</td>"
+                widget += "</tr>"
+            widget += "</table><br />"
+        return widget
 
 
 class Notification(db.Model):

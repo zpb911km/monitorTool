@@ -1,0 +1,16 @@
+<div style="margin: 10px;">
+    <button onclick="window.location.href='/class/<!--class_id-->/schedule'" class="btn">集体课表</button>
+    <!--confirm_details-->
+    <button onclick="window.location.href='/class/<!--class_id-->/write_notification'" class="btn">新建通知</button>
+    <details>
+        <summary>编辑班级成员</summary>
+        <form method="post" style="text-align: center;">
+            学生
+            <textarea id="students" name="students" class="input-item" rows="<!--len_students-->"><!--students--></textarea>
+            管理员
+            <textarea id="admins" name="admins" class="input-item" rows="<!--len_admins-->"><!--admins--></textarea>
+            <button type="submit" class="btn" style="width: 90%;">更新成员</button>
+        </form>
+    </details>
+    <button onclick="window.location.href='/class/<!--class_id-->/exit'" class="btn" style="background-color: #dc143c;">解散班级</button>
+</div>
