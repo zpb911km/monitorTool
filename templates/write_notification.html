@@ -1,0 +1,15 @@
+<form method="POST">
+    <input type="text" id="title" name="title" placeholder="通知标题" class="input-item" required>
+    <br>
+    <textarea id="content" name="content" placeholder="通知内容" class="input-item" required></textarea>
+    <br>
+    <input type="datetime-local" id="deadline" name="deadline" required>
+    <br>
+    <input type="checkbox" id="need_confirm" name="need_confirm">
+    <label for="need_confirm">需要确认</label>
+    <br>
+    <input type="checkbox" id="need_submit" name="need_submit">
+    <label for="need_submit">需要提交</label>
+    <br>
+    <button type="submit" class="btn">发布通知</button>
+</form>

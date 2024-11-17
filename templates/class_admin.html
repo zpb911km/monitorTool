@@ -1,7 +1,10 @@
 <div style="margin: 10px;">
     <button onclick="window.location.href='/class/<!--class_id-->/schedule'" class="btn">集体课表</button>
+    <br />
     <!--confirm_details-->
+    <br />
     <button onclick="window.location.href='/class/<!--class_id-->/write_notification'" class="btn">新建通知</button>
+    <br />
     <details>
         <summary>编辑班级成员</summary>
         <form method="post" style="text-align: center;">
@@ -12,5 +15,6 @@
             <button type="submit" class="btn" style="width: 90%;">更新成员</button>
         </form>
     </details>
-    <button onclick="window.location.href='/class/<!--class_id-->/exit'" class="btn" style="background-color: #dc143c;">解散班级</button>
+    <br />
+    <button onclick="window.location.href='/class/<!--class_id-->/dismiss'" class="btn" style="background-color: #dc143c;">解散班级</button>
 </div>

@@ -1,0 +1,12 @@
+<div style="text-align: center;">
+    <form id="upload_form" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" hidden />
+        <div style="display: flex; justify-content: center; align-items: center; height: 30vh; width: 100%; margin: auto;">
+            <label style="text-align: center;" name="file_name">请选择文件</label>
+        </div>
+        <script src="/static/js/submit.js"></script>
+        <button type="button" class="btn" onclick="get_file()" style="width: 60%;margin: 20px auto;">选择文件</button>
+        <button name="submit" type="button" class="btn" onclick="submitForm()" style="width: 60%;margin: 20px auto;">确认上传</button>
+        <button name="submitAction" type="submit" hidden></button>
+    </form>
+</div>

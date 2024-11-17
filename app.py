@@ -2,7 +2,7 @@ from flask import Flask, render_template, session, redirect, url_for, request, m
 from flask_sqlalchemy import SQLAlchemy
 import random
 from init import app, db
-from core import Person, Class, Html_Error, Html_index, send_verify, send_warning, is_valid_email, is_valid_username, is_valid_password, parse_xls, is_valid_input_str
+from core import Person, Class, Notification, Html_Error, Html_index, send_verify, send_warning, is_valid_email, is_valid_username, is_valid_password, parse_xls, is_valid_input_str
 import traceback
 import os
 from time import sleep
@@ -63,40 +63,15 @@ def home():
 def class_page(class_id):
     people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
     class_ = Class.query.filter_by(id=class_id).first()  # 获取课程信息
-    class_.sync_to_people()
     if not class_:
-        err = Html_Error("课程不存在", '课程不存在<a href="/">返回主页</a>')  # 显示错误信息
+        err = Html_Error("课程不存在", f"课程{class_id}不存在")  # 显示错误信息
         return err.get_html()  # 返回错误信息页面
-    if str(people.id) in class_.administrators:
-        # TODO: 移植到core
-        widget = open("templates/class_admin.html", "r", encoding="utf-8").read()
-        widget = widget.replace("<!--class_id-->", class_.id)
-        students = []
-        for student_id in class_.students.split(","):
-            student = Person.query.filter_by(id=student_id).first()
-            if student:
-                students.append(student.name + " " + str(student.id))
-        admins = []
-        for admin_id in class_.administrators.split(","):
-            admin = Person.query.filter_by(id=admin_id).first()
-            if admin:
-                admins.append(admin.name + " " + str(admin.id))
-        widget = widget.replace("<!--admins-->", "\n".join(admins))
-        widget = widget.replace("<!--len_admins-->", str(len(admins)))
-        widget = widget.replace("<!--students-->", "\n".join(students))
-        widget = widget.replace("<!--len_students-->", str(len(students)))
-        widget = widget.replace("<!--confirm_details-->", '<div style="background-color: #0000ff; width: 100%; height: 100%;"></div>')
-        html = Html_index(people, widget)
-        return html.get_html()  # 返回课程管理页面
-    elif str(people.id) in class_.students:
-        widget = open("templates/class_stu.html", "r", encoding="utf-8").read()
-        html = Html_index(people, widget)
-        return html.get_html()  # 返回课程成员页面
-    else:
-        people.classes = people.classes.replace(str(class_id) + ",", "").replace(str(class_id), "")
-        db.session.commit()
-        err = Html_Error("无权限访问", '无权限访问<a href="/">返回主页</a>')  # 显示错误信息
-        return err.get_html()  # 返回错误信息页面
+    class_.sync_to_people()
+    if request.method == "POST":
+        students = request.form["students"].split("\r\n")
+        admins = request.form["admins"].split("\r\n")
+        class_.update_members(admins, students)
+    return class_.methods_page(people)  # 返回课程页面
 
 
 @app.route("/class/<int:class_id>/schedule")
@@ -104,11 +79,101 @@ def class_page(class_id):
 def class_schedule(class_id):
     class_ = Class.query.filter_by(id=class_id).first()  # 获取课程信息
     if not class_:
-        err = Html_Error("课程不存在", '课程不存在<a href="/">返回主页</a>')  # 显示错误信息
+        err = Html_Error("课程不存在", "课程不存在")  # 显示错误信息
         return err.get_html()  # 返回错误信息页面
     people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
-    html = Html_index(people, class_.schedule_name().replace("\n", "<br />"))
+    if str(people.id) in class_.administrators.split(","):
+        widget = class_.schedule_name()
+    elif str(people.id) in class_.students.split(","):
+        widget = class_.schedule_count()
+    else:
+        err = Html_Error("权限不足", "你没有权限查看课程时间表")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    widget += "<script>"
+    widget += open("static/js/fill_color.js", "r", encoding="utf-8").read().replace("<!--total-->", str(len(class_.students.split(",")) + len(class_.administrators.split(","))))
+    widget += "</script>"
+    html = Html_index(people, widget)
     return html.get_html()  # 返回课程时间表页面
+
+
+@app.route("/class/<int:class_id>/dismiss")
+@if_login
+def class_dismiss(class_id):
+    class_ = Class.query.filter_by(id=class_id).first()  # 获取课程信息
+    if not class_:
+        err = Html_Error("课程不存在", "课程不存在")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
+    if str(people.id) in class_.administrators.split(","):
+        class_.dismiss()
+        return redirect("/")
+    else:
+        err = Html_Error("权限不足", "你没有权限删除课程")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+
+
+@app.route("/class/<int:class_id>/write_notification", methods=["GET", "POST"])
+@if_login
+def class_write_notification(class_id):
+    class_ = Class.query.filter_by(id=class_id).first()  # 获取课程信息
+    if not class_:
+        err = Html_Error("课程不存在", "课程不存在")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    if request.method == "POST":
+        title = request.form["title"]
+        content = request.form["content"]
+        deadline = request.form["deadline"]
+        need_confirm = request.form.get("need_confirm", "off") == "on"
+        need_submit = request.form.get("need_submit", "off") == "on"
+        if need_confirm:
+            unconfirmeds = class_.students + "," + class_.administrators
+            confirmeds = ""
+        else:
+            unconfirmeds = ""
+            confirmeds = class_.students + "," + class_.administrators
+        if need_submit:
+            file_path = os.path.join("data", "submissions", str(random.randint(100000, 999999)))
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        else:
+            file_path = ""
+        notification_id = Notification.new(title, content, deadline, confirmeds, unconfirmeds, file_path)
+        class_.notifications += notification_id + ","
+        db.session.commit()
+        return redirect("/class/" + str(class_id))  # 重定向到课程页面
+    people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
+    widget = open("templates/write_notification.html", "r", encoding="utf-8").read()
+    html = Html_index(people, widget)
+    return html.get_html()  # 返回主页
+
+
+@app.route("/submit/<int:passkey>", methods=["GET", "POST"])
+@if_login
+def submit(passkey):
+    people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
+    if request.method == "POST":
+        file = request.files["file"]
+        if not file:
+            err = Html_Error("文件为空", "请选择文件")  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
+        file_path = os.path.join("data", "submissions", str(passkey))
+        if not os.path.exists(file_path):
+            err = Html_Error("提交失败", "提交链接已失效")  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
+        file_name = file.filename
+        file_path = os.path.join(file_path, people.name + "_" + str(people.id) + "_" + file_name)
+        file.save(file_path)
+        return """
+                    文件上传成功
+                    <script>
+                        setTimeout(function() {
+                            window.location.href = "/";
+                        }, 2000);
+                    </script>
+                """
+    else:
+        widget = open("templates/submit.html", "r", encoding="utf-8").read()
+        html = Html_index(people, widget)
+        return html.get_html()  # 返回提交页面
 
 
 @app.route("/create_class", methods=["GET", "POST"])
@@ -118,27 +183,28 @@ def create_class():
     if request.method == "POST":
         class_name = request.form["class_name"]
         members = request.form["members"]
-        administators = request.form["administators"]
-        if is_valid_input_str(class_name) and is_valid_input_str(members) and is_valid_input_str(administators):
+        administrators = request.form["administrators"]
+        if is_valid_input_str(class_name) and is_valid_input_str(members) and is_valid_input_str(administrators):
             pass
         else:
             err = Html_Error("输入错误", '含有非法字符<a href="/create_class">返回创建课程</a>')  # 显示错误信息
             return err.get_html()  # 返回错误信息页面
-        if not class_name or not members or not administators:
+        if not class_name or not members or not administrators:
             err = Html_Error("不能为空", '课程名称与成员与管理员均不能为空<a href="/create_class">返回创建课程</a>')  # 显示错误信息
             return err.get_html()  # 返回错误信息页面
         class_id = random.randint(100000, 999999)  # 生成随机课程 ID
         while Class.query.filter_by(id=class_id).first():  # 防止 ID 重复
             class_id = class_id + 1
         class_members = members.split("\n")
-        class_administators = administators.split("\n")
+        class_administrators = administrators.split("\n")
         member_remove = []
         for member in class_members:
-            if member in class_administators:
+            if member in class_administrators:
                 member_remove.append(member)
         for member in member_remove:
             class_members.remove(member)
-        Class.new(class_id, class_name, class_administators, class_members)
+        Class.new(class_id, class_name, class_administrators, class_members)
+        return redirect("/class/" + str(class_id))  # 重定向到课程页面
     widget = open("templates/create_class.html", "r", encoding="utf-8").read()
     html = Html_index(people, widget)
     return html.get_html()  # 返回创建课程页面
@@ -399,9 +465,9 @@ def logout():
 
 
 # 删除账户
-@app.route("/delete", methods=["GET", "POST"])
+@app.route("/user/rm", methods=["GET", "POST"])
 @if_login
-def delete():
+def rm_user():
     if request.method == "POST":
         # 再验证合法性
         id = request.cookies.get("id")  # 从 URL 中获取用户 ID
@@ -418,6 +484,13 @@ def delete():
             return redirect("/login")  # 重定向到密码重置页面
         # 验证完了
         Person.query.filter_by(id=id).delete()  # 删除用户
+        for class_ in Class.query.all():  # 删除用户在所有班级中的记录
+            if str(session["id"]) in class_.students:
+                class_.students.replace(str(session["id"]) + ",", "").replace(str(session["id"]), "")
+            elif str(session["id"]) in class_.administors:
+                class_.administors.replace(str(session["id"]) + ",", "").replace(str(session["id"]), "")
+            class_.unsynced_peoples += str(session["id"]) + ","
+        # TODO: 删通知
         db.session.commit()  # 提交数据库更改
         session.pop("id", None)  # 从会话中移除用户 ID
         session.pop("name", None)  # 从会话中移除用户姓名

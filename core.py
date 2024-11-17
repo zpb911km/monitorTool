@@ -5,6 +5,8 @@ from email.header import Header
 import re
 import pandas as pd
 from flask import render_template
+from datetime import datetime
+import random
 
 
 SPLITER = "(A"
@@ -306,7 +308,7 @@ class Class(db.Model):
                     if schedule[w][d][n] == "":
                         widget += ""
                     else:
-                        widget += f"{schedule[w][d][n]}"
+                        widget += f"{schedule[w][d][n]}".replace("\n", "<br />")
                     widget += "</td>"
                 widget += "</tr>"
             widget += "</table><br />"
@@ -342,22 +344,113 @@ class Class(db.Model):
                     if schedule[w][d][n] == "":
                         widget += ""
                     else:
-                        widget += f"{schedule[w][d][n]}"
+                        widget += f"{len(schedule[w][d][n])}"
                     widget += "</td>"
                 widget += "</tr>"
             widget += "</table><br />"
         return widget
 
+    def methods_page(self, people: Person) -> str:
+        if str(people.id) in self.administrators:
+            widget = open("templates/class_admin.html", "r", encoding="utf-8").read()
+            widget = widget.replace("<!--class_id-->", self.id)
+            students = []
+            for student_id in self.students.split(","):
+                student = Person.query.filter_by(id=student_id).first()
+                if student:
+                    students.append(student.name + " " + str(student.id))
+                else:
+                    students.append(f"未登录 {student_id}")
+            admins = []
+            for admin_id in self.administrators.split(","):
+                admin = Person.query.filter_by(id=admin_id).first()
+                if admin:
+                    admins.append(admin.name + " " + str(admin.id))
+                else:
+                    admins.append(f"未登录 {admin_id}")
+            widget = widget.replace("<!--admins-->", "\n".join(admins))
+            widget = widget.replace("<!--len_admins-->", str(len(admins) + 1))
+            widget = widget.replace("<!--students-->", "\n".join(students))
+            widget = widget.replace("<!--len_students-->", str(len(students) + 1))
+            widget = widget.replace("<!--confirm_details-->", f'<div style="background-color: #0000ff; width: 100%; height: 100%;">{self.notifications}</div>')
+            html = Html_index(people, widget)
+            return html.get_html()  # 返回课程管理页面
+        elif str(people.id) in self.students:
+            widget = open("templates/class_stu.html", "r", encoding="utf-8").read()
+            widget = widget.replace("<!--class_id-->", self.id)
+            html = Html_index(people, widget)
+            return html.get_html()  # 返回课程成员页面
+        else:
+            people.classes = people.classes.replace(str(self.id) + ",", "").replace(str(self.id), "")
+            db.session.commit()
+            err = Html_Error("无权限访问", '无权限访问<a href="/">返回主页</a>')  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
+
+    def update_members(self, administrators: list[str], students: list[str]) -> None:
+        for admin in administrators:
+            person = Person.query.filter_by(id=int(admin.split(" ")[1])).first()
+            if person is not None:
+                person.classes = person.classes.replace(self.id + ",", "").replace(self.id, "")
+        for member in students:
+            person = Person.query.filter_by(id=int(member.split(" ")[1])).first()
+            if person is not None:
+                person.classes = person.classes.replace(self.id + ",", "").replace(self.id, "")
+        admins = ",".join([admin_in.split(" ")[1].strip() for admin_in in administrators if admin_in != ""])
+        members = ",".join([member_in.split(" ")[1].strip() for member_in in students if member_in != ""])
+        unsynced = []
+        for admin in admins.split(","):
+            person = Person.query.filter_by(id=int(admin)).first()
+            if person is not None:
+                if self.id not in person.classes.split(","):
+                    person.classes += f"{self.id},"
+            else:
+                unsynced.append(admin)
+        for member in members.split(","):
+            person = Person.query.filter_by(id=int(member)).first()
+            if person is not None:
+                if self.id not in person.classes.split(","):
+                    person.classes += f"{self.id},"
+            else:
+                unsynced.append(member)
+        unsynced_peoples = ",".join(unsynced)
+        self.administrators = admins
+        self.students = members
+        self.unsynced_peoples = unsynced_peoples
+        self.sync_to_people()
+        db.session.commit()
+
+    def dismiss(self) -> None:
+        for student_id in self.students.split(","):
+            student = Person.query.filter_by(id=student_id).first()
+            if student is not None:
+                student.classes = student.classes.replace(self.id + ",", "").replace(self.id, "")
+        for admin_id in self.administrators.split(","):
+            admin = Person.query.filter_by(id=admin_id).first()
+            if admin is not None:
+                admin.classes = admin.classes.replace(self.id + ",", "").replace(self.id, "")
+        db.session.delete(self)
+        db.session.commit()
+
 
 class Notification(db.Model):
     __tablename__ = "notifications"
 
-    id = db.Column(db.String(256), primary_key=True)  # 设置长度为 256
+    id = db.Column(db.Integer, primary_key=True)  # 设置长度为 256
     title = db.Column(db.String(256))  # 设置长度为 256
-    content = db.Column(db.Text)  # 通知内容
+    content = db.Column(db.Text)  # 通知内容`   `
     deadline = db.Column(db.DateTime)  # 截止日期
     confirmeds = db.Column(db.Text)  # 以逗号分隔的确认者 ID 字符串
     unconfirmeds = db.Column(db.Text)  # 以逗号分隔的未确认者 ID 字符串
+    file_path = db.Column(db.String(256))  # 文件路径
+
+    def new(title: str, content: str, deadline: datetime, confirmeds: str, unconfirmeds: str, file_path: str) -> str:
+        id = random.randint(1000000000, 9999999999)
+        while Notification.query.filter_by(id=id).first() is not None:
+            id += 1
+        notification = Notification(id=id, title=title, content=content, deadline=deadline, confirmeds=confirmeds, unconfirmeds=unconfirmeds, file_path=file_path)
+        db.session.add(notification)
+        db.session.commit()
+        return str(id)
 
 
 class Html_index:
@@ -391,6 +484,7 @@ class Html_index:
         main_area = open("./templates/userinfo.html", "r", encoding="utf-8").read()
         main_area = main_area.replace("<!--username-->", self.user.username)
         main_area = main_area.replace("<!--table-->", self.user.format_courses())
+        main_area += '<a href="user/rm" style="color:red;font-size:16px;">销毁账号</a>'
         self.main_area = main_area
         return self.get_html()
 
