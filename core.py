@@ -124,6 +124,8 @@ class Person(db.Model):
         return widget
 
     def clean_classes(self) -> None:
+        if self.classes is None:
+            return None
         ids = self.classes.split(",")
         id_useful = []
         for id in ids:
@@ -230,7 +232,6 @@ class Class(db.Model):
     name = db.Column(db.String(256))  # 设置长度为 256
     administrators = db.Column(db.Text)  # 以逗号分隔的管理员 ID 字符串
     students = db.Column(db.Text)  # 以逗号分隔的学生 ID 字符串
-    notifications = db.Column(db.Text)  # 以逗号分隔的通知 ID 字符串
     unsynced_peoples = db.Column(db.Text)  # 以逗号分隔的未同步人员 ID 字符串
 
     def sync_to_people(self) -> None:
@@ -272,7 +273,7 @@ class Class(db.Model):
             else:
                 unsynced.append(member)
         unsynced_peoples = ",".join(unsynced)
-        class_ = Class(id=id, name=name, administrators=admins, students=members, notifications="", unsynced_peoples=unsynced_peoples)
+        class_ = Class(id=id, name=name, administrators=admins, students=members, unsynced_peoples=unsynced_peoples)
         class_.sync_to_people()
         db.session.add(class_)
         db.session.commit()
@@ -372,7 +373,7 @@ class Class(db.Model):
             widget = widget.replace("<!--len_admins-->", str(len(admins) + 1))
             widget = widget.replace("<!--students-->", "\n".join(students))
             widget = widget.replace("<!--len_students-->", str(len(students) + 1))
-            widget = widget.replace("<!--confirm_details-->", f'<div style="background-color: #0000ff; width: 100%; height: 100%;">{self.notifications}</div>')
+            widget = widget.replace("<!--notifications-->", Notification.get_html_widget(class_=self, people=None))
             html = Html_index(people, widget)
             return html.get_html()  # 返回课程管理页面
         elif str(people.id) in self.students:
@@ -442,15 +443,68 @@ class Notification(db.Model):
     confirmeds = db.Column(db.Text)  # 以逗号分隔的确认者 ID 字符串
     unconfirmeds = db.Column(db.Text)  # 以逗号分隔的未确认者 ID 字符串
     file_path = db.Column(db.String(256))  # 文件路径
+    class_id = db.Column(db.String(256), db.ForeignKey("classes.id", ondelete="CASCADE"))
 
-    def new(title: str, content: str, deadline: datetime, confirmeds: str, unconfirmeds: str, file_path: str) -> str:
-        id = random.randint(1000000000, 9999999999)
+    def new(title: str, content: str, deadline: datetime, confirmeds: str, unconfirmeds: str, file_path: str, class_id: str) -> str:
+        id = random.randint(-2147483648, 2147483647)
         while Notification.query.filter_by(id=id).first() is not None:
             id += 1
-        notification = Notification(id=id, title=title, content=content, deadline=deadline, confirmeds=confirmeds, unconfirmeds=unconfirmeds, file_path=file_path)
+        notification = Notification(id=id, title=title, content=content, deadline=deadline, confirmeds=confirmeds, unconfirmeds=unconfirmeds, file_path=file_path, class_id=class_id)
         db.session.add(notification)
         db.session.commit()
         return str(id)
+
+    def get_html_widget(class_: Class, people: Person | None = None) -> str:
+        notifications = Notification.query.filter_by(class_id=class_.id).all()
+        widget = ""
+        for notification in notifications:
+            days = (notification.deadline - datetime.now()).days
+            if days < 30 and days >= 0:
+                color = display_color(1 - days / 30)
+            elif days < 0:
+                color = "#555555"
+            else:
+                color = "#FFFFFF"
+            widget += f'<div style="margin-bottom: 20px; border: none; padding: 10px; border-radius: 5px; box-shadow: 10px 10px 10px {color}; background-color: #272733; margin: 20px;">\n'
+            widget += "<h2>来自" + class_.name + "的通知:</h2>\n"
+            widget += "<h3>" + notification.title + "</h3>\n"
+            widget += "<p>" + notification.content.replace("\n", "<br>").replace("\r", "") + "</p>\n"
+            widget += "<p>截止时间：" + notification.str_deadline() + "</p>\n"
+
+            if people is not None:
+                widget += '<div style="text-align: right; padding-top: 10px;">'
+                if people.id not in notification.confirmeds.split(","):
+                    widget += f'<button id="confirm_status_change" style="padding: 5px 10px; background-color: #AF4C50; color: white; border: none;" onclick="confirmNotification(\'{class_.name}\', {notification.id}, this)">请确认收到通知</button>\n'
+                else:
+                    widget += f'<button id="confirm_status_change" style="padding: 5px 10px; background-color: #4CAF50; color: white; border: none;" onclick="disconfirmNotification(\'{class_.name}\', {notification.id}, this)">已确认收到通知</button>\n'
+                widget += "</div>"
+            else:
+                widget += "<details><summary>已确认收到通知</summary><ul>"
+                for id in notification.confirmeds.split(","):
+                    if id == "":
+                        continue
+                    person = Person.query.filter_by(id=int(id)).first()
+                    if person is not None:
+                        widget += f"<li>{person.name}</li>"
+                widget += "</ul></details>"
+                widget += "<details><summary>未确认收到通知</summary><ul>"
+                for id in notification.unconfirmeds.split(","):
+                    person = Person.query.filter_by(id=int(id)).first()
+                    if person is not None:
+                        widget += f"<li>{person.name}</li>"
+                widget += "</ul></details>"
+            widget += "</div>\n"
+            if people is not None:
+                widget += "<script>"
+                script = open("static/js/confirm.js", "r", encoding="utf-8").read()
+                script = script.replace("<class>", str(class_.id))
+                script = script.replace("<notification>", str(notification.id))
+                widget += script
+                widget += "</script>"
+        return widget
+
+    def str_deadline(self) -> str:
+        return self.deadline.strftime("%Y-%m-%d %H:%M:%S")
 
 
 class Html_index:
@@ -478,6 +532,10 @@ class Html_index:
         return html
 
     def get_index_html(self) -> str:
+        widget = ""
+        for class_ in self.classes:
+            widget += Notification.get_html_widget(class_, self.user)
+        self.main_area = widget
         return self.get_html()
 
     def get_user_html(self) -> str:
@@ -623,9 +681,11 @@ def is_valid_password(password: str) -> bool:
 
     返回:
         bool: 如果密码格式合法，返回 True；否则返回 False。
+
+    更新说明:
+        用户端直接返回sha256加密后的密码，不再进行验证。
     """
-    pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])[a-zA-Z0-9_-]{8,20}$"
-    return re.match(pattern, password) is not None
+    return True
 
 
 def parse_xls(file_content: str, is_gbk=False) -> str:
@@ -749,3 +809,17 @@ def merge_list(*lists) -> list:
         for n, item in enumerate(li):
             out[n] = merge_list(out[n], item)
     return out
+
+
+def display_color(rate: float):
+    hsla = "hsla("
+    h = int(240 - 240 * rate)
+    if h < 0:
+        h += 360
+    elif h > 360:
+        h -= 360
+    s = 1  # 饱和度
+    l = 0.3 + 0.2 * rate  # 亮度
+    a = 0.5  # 透明度
+    hsla += str(h) + "," + str(s * 100) + "%," + str(l * 100) + "%" + "," + str(a) + ")"
+    return hsla

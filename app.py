@@ -1,4 +1,4 @@
-from flask import Flask, render_template, session, redirect, url_for, request, make_response, send_from_directory
+from flask import Flask, jsonify, render_template, session, redirect, url_for, request, make_response, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 import random
 from init import app, db
@@ -55,7 +55,7 @@ def home():
         class_.sync_to_people()
     people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
     html = Html_index(people)
-    return html.get_html()  # 返回主页
+    return html.get_index_html()  # 返回主页
 
 
 @app.route("/class/<int:class_id>", methods=["GET", "POST"])
@@ -72,6 +72,22 @@ def class_page(class_id):
         admins = request.form["admins"].split("\r\n")
         class_.update_members(admins, students)
     return class_.methods_page(people)  # 返回课程页面
+
+
+@app.route("/class/<class_id>/confirm/<notification_id>", methods=["POST"])
+def confirm_notification(class_id, notification_id):
+    # 处理确认逻辑
+    # 更新数据库中该 notification 的确认状态
+    # ...
+    return jsonify({"message": "确认状态已更新"})
+
+
+@app.route("/class/<class_id>/disconfirm/<notification_id>", methods=["POST"])
+def disconfirm_notification(class_id, notification_id):
+    # 处理取消确认逻辑
+    # 更新数据库中该 notification 的确认状态
+    # ...
+    return jsonify({"message": "确认状态已取消"})
 
 
 @app.route("/class/<int:class_id>/schedule")
@@ -136,8 +152,7 @@ def class_write_notification(class_id):
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
         else:
             file_path = ""
-        notification_id = Notification.new(title, content, deadline, confirmeds, unconfirmeds, file_path)
-        class_.notifications += notification_id + ","
+        notification_id = Notification.new(title, content, deadline, confirmeds, unconfirmeds, file_path, class_.id)
         db.session.commit()
         return redirect("/class/" + str(class_id))  # 重定向到课程页面
     people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
@@ -276,7 +291,7 @@ def favicon():
     return send_from_directory("static/icon", "favicon.ico")  # 发送静态文件
 
 
-# 用户登录示例
+# 用户登录
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -295,7 +310,7 @@ def login():
             session["id"] = id  # 将用户 ID 存储在会话中
             return resp
         else:
-            err = Html_Error("用户名或密码错误", '用户名或密码错误<a href="/login">返回登录</a>')  # 显示错误信息
+            err = Html_Error("用户名或密码错误", '用户名或密码错误,或者还没有注册账户<br /><a href="/register">前往注册</a>')  # 显示错误信息
             return err.get_html()  # 返回错误信息页面
 
     try:
@@ -487,8 +502,8 @@ def rm_user():
         for class_ in Class.query.all():  # 删除用户在所有班级中的记录
             if str(session["id"]) in class_.students:
                 class_.students.replace(str(session["id"]) + ",", "").replace(str(session["id"]), "")
-            elif str(session["id"]) in class_.administors:
-                class_.administors.replace(str(session["id"]) + ",", "").replace(str(session["id"]), "")
+            elif str(session["id"]) in class_.administrators:
+                class_.administrators.replace(str(session["id"]) + ",", "").replace(str(session["id"]), "")
             class_.unsynced_peoples += str(session["id"]) + ","
         # TODO: 删通知
         db.session.commit()  # 提交数据库更改
@@ -502,7 +517,7 @@ def rm_user():
         resp.set_cookie("key", "", expires=0)  # 清除登录密钥作为 cookie
         return resp  # 返回修改后的响应对象
     else:
-        err = Html_Error("确认删除账户吗？", '再问你一遍,确认删除账户吗？<form method="post"><input class="btn type="submit" value="确认"></form>')  # 显示确认删除账户信息页面
+        err = Html_Error("确认删除账户吗？", '再问你一遍,确认删除账户吗？<form method="post"><input class="btn" type="submit" value="确认"></form>')  # 显示确认删除账户信息页面
         return err.get_html()  # 返回确认删除账户信息页面
 
 

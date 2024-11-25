@@ -11,21 +11,40 @@
     <script src="{{ url_for('static', filename='js/rain.js') }}"></script>
     <div class="login-wrapper">
         <div class="header">登录</div>
-        <form method="POST">
+        <form method="POST" onsubmit="return hashPassword()">
             <div class="form-wrapper">
                 <input type="text" name="username" placeholder="用户名" class="input-item" required>
-                <input type="password" name="password" placeholder="密码" class="input-item" required>
+                <input id ="password" type="password" name="password" placeholder="密码" class="input-item" required>
                 <button type="submit" class="btn">登录</button>
             </div>
-            <div class="msg">
-                没有账户?
-                <a href="/register">注册</a>
-            </div>
-            <div class="msg">
-                忘记密码?
-                <a href="/reset">重置用户名和密码</a>
-            </div>
         </form>
+        <div class="msg">
+            没有账户?
+            <a href="/register">注册</a>
+        </div>
+        <div class="msg">
+            忘记密码?
+            <a href="/reset">重置用户名和密码</a>
+        </div>
     </div>
+    <script>
+        async function hashPassword() {
+            const passwordField = document.getElementById('password');
+            const password = passwordField.value;
+        
+            // 使用 SubtleCrypto 计算 SHA-256 哈希值
+            const encoder = new TextEncoder();
+            const data = encoder.encode(password);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data); // 计算哈希值
+            const hashArray = Array.from(new Uint8Array(hashBuffer)); // 转换成字节数组
+            const hashHex = hashArray.map(b => ('00' + b.toString(16)).slice(-2)).join(''); // 转换为十六进制字符串
+        
+            passwordField.value = hashHex; // 替换原密码为哈希值
+            const button = document.querySelector('button[type="submit"]');
+            button.disabled = true; // 禁用提交按钮，防止多次提交
+            button.innerHTML = '密码校验中...';
+            return true; // 让表单提交
+        }
+    </script>
 </body>
 </html>

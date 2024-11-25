@@ -1,7 +1,10 @@
 <div style="margin: 10px;">
     <button onclick="window.location.href='/class/<!--class_id-->/schedule'" class="btn">集体课表</button>
     <br />
-    <!--confirm_details-->
+    <details>
+        <summary>通知确认情况</summary>
+        <!--notifications-->
+    </details>
     <br />
     <button onclick="window.location.href='/class/<!--class_id-->/write_notification'" class="btn">新建通知</button>
     <br />
@@ -16,5 +19,6 @@
         </form>
     </details>
     <br />
-    <button onclick="window.location.href='/class/<!--class_id-->/dismiss'" class="btn" style="background-color: #dc143c;">解散班级</button>
+    <button onclick="if(confirm('确定要解散班级吗？')) { window.location.href='/class/<!--class_id-->/dismiss'; }" class="btn" style="background-color: #dc143c;">解散班级</button>
+
 </div>
