@@ -7,6 +7,7 @@ import pandas as pd
 from flask import render_template
 from datetime import datetime
 import random
+import os
 
 
 SPLITER = "(A"
@@ -458,53 +459,72 @@ class Notification(db.Model):
         notifications = Notification.query.filter_by(class_id=class_.id).all()
         widget = ""
         for notification in notifications:
-            days = (notification.deadline - datetime.now()).days
-            if days < 30 and days >= 0:
-                color = display_color(1 - days / 30)
-            elif days < 0:
-                color = "#555555"
-            else:
-                color = "#FFFFFF"
-            widget += f'<div style="margin-bottom: 20px; border: none; padding: 10px; border-radius: 5px; box-shadow: 10px 10px 10px {color}; background-color: #272733; margin: 20px;">\n'
-            widget += "<h2>来自" + class_.name + "的通知:</h2>\n"
-            widget += "<h3>" + notification.title + "</h3>\n"
-            widget += "<p>" + notification.content.replace("\n", "<br>").replace("\r", "") + "</p>\n"
-            widget += "<p>截止时间：" + notification.str_deadline() + "</p>\n"
+            widget = notification.each_html(class_, people, widget)
+        return widget
 
-            if people is not None:
-                widget += '<div style="text-align: right; padding-top: 10px;">'
-                if people.id not in notification.confirmeds.split(","):
-                    widget += f'<button id="confirm_status_change" style="padding: 5px 10px; background-color: #AF4C50; color: white; border: none;" onclick="confirmNotification(\'{class_.name}\', {notification.id}, this)">请确认收到通知</button>\n'
-                else:
-                    widget += f'<button id="confirm_status_change" style="padding: 5px 10px; background-color: #4CAF50; color: white; border: none;" onclick="disconfirmNotification(\'{class_.name}\', {notification.id}, this)">已确认收到通知</button>\n'
-                widget += "</div>"
+    def each_html(self, class_, people, widget):
+        days = (self.deadline - datetime.now()).days
+        if days < 30 and days >= 0:
+            color = display_color(1 - days / 30)
+        elif days < 0:
+            color = "#555555"
+        else:
+            color = "#FFFFFF"
+        widget += f'<div style="margin-bottom: 20px; border: none; padding: 10px; border-radius: 5px; box-shadow: 10px 10px 10px {color}; background-color: #272733; margin: 20px;">\n'
+        widget += "<h2>来自" + class_.name + "的通知:</h2>\n"
+        widget += "<h3>" + self.title + "</h3>\n"
+        widget += "<p>" + self.content.replace("\n", "<br>").replace("\r", "") + "</p>\n"
+        widget += "<p>截止时间：" + self.str_deadline() + "</p>\n"
+        if self.file_path != "no_file_path":
+            print(self.file_path)
+            widget += f'<a href="/file_submit/{self.file_path}">文件点此处提交</a>'
+        if people is not None:
+            widget += '<div style="text-align: right; padding-top: 10px;">'
+            if str(people.id) not in self.confirmeds.split(","):
+                widget += f'<button id="confirm_status_change" style="padding: 5px 10px; background-color: #AF4C50; color: white; border: none;" onclick="confirmNotification(\'{class_.name}\', {self.id}, this)">请确认收到通知</button>\n'
             else:
-                widget += "<details><summary>已确认收到通知</summary><ul>"
-                for id in notification.confirmeds.split(","):
-                    if id == "":
-                        continue
-                    person = Person.query.filter_by(id=int(id)).first()
-                    if person is not None:
-                        widget += f"<li>{person.name}</li>"
-                widget += "</ul></details>"
-                widget += "<details><summary>未确认收到通知</summary><ul>"
-                for id in notification.unconfirmeds.split(","):
-                    person = Person.query.filter_by(id=int(id)).first()
-                    if person is not None:
-                        widget += f"<li>{person.name}</li>"
-                widget += "</ul></details>"
-            widget += "</div>\n"
-            if people is not None:
-                widget += "<script>"
-                script = open("static/js/confirm.js", "r", encoding="utf-8").read()
-                script = script.replace("<class>", str(class_.id))
-                script = script.replace("<notification>", str(notification.id))
-                widget += script
-                widget += "</script>"
+                widget += f'<button id="confirm_status_change" style="padding: 5px 10px; background-color: #4CAF50; color: white; border: none;" onclick="disconfirmNotification(\'{class_.name}\', {self.id}, this)">已确认收到通知</button>\n'
+            widget += "</div>"
+        else:
+            widget += "<details><summary>已确认收到通知</summary><ul>"
+            for id in self.confirmeds.split(","):
+                if id == "":
+                    continue
+                person = Person.query.filter_by(id=int(id)).first()
+                if person is not None:
+                    widget += f"<li>{person.name}</li>"
+            widget += "</ul></details>"
+            widget += "<details><summary>未确认收到通知</summary><ul>"
+            for id in self.unconfirmeds.split(","):
+                if id == "":
+                    continue
+                person = Person.query.filter_by(id=int(id)).first()
+                if person is not None:
+                    widget += f"<li>{person.name}</li>"
+            widget += "</ul></details>"
+            widget += f'<div style="text-align: right;"><button style="padding: 5px 10px; background-color: #AF4C50; color: white; border: none;" onclick="location.href=\'/class/{class_.id}/delete_notification/{self.id}\'">删除通知</button><button style="padding: 5px 10px; background-color: #4CAF50; color: white; border: none;" onclick="location.href=\'/download_file_from_notification/{self.id}\'">下载文件</button></div>'
+        widget += "</div>\n"
+        if people is not None:
+            widget += "<script>"
+            script = open("static/js/confirm.js", "r", encoding="utf-8").read()
+            script = script.replace("<class>", str(class_.id))
+            script = script.replace("<notification>", str(self.id))
+            widget += script
+            widget += "</script>"
         return widget
 
     def str_deadline(self) -> str:
         return self.deadline.strftime("%Y-%m-%d %H:%M:%S")
+
+    def confirm(self, person: Person) -> None:
+        self.unconfirmeds = self.unconfirmeds.replace(str(person.id) + ",", "").replace(str(person.id), "")
+        self.confirmeds += str(person.id) + ","
+        db.session.commit()
+
+    def disconfirm(self, person: Person) -> None:
+        self.confirmeds = self.confirmeds.replace(str(person.id) + ",", "").replace(str(person.id), "")
+        self.unconfirmeds += str(person.id) + ","
+        db.session.commit()
 
 
 class Html_index:
@@ -823,3 +843,28 @@ def display_color(rate: float):
     a = 0.5  # 透明度
     hsla += str(h) + "," + str(s * 100) + "%," + str(l * 100) + "%" + "," + str(a) + ")"
     return hsla
+
+
+def recursive_remove(folder_path):
+    # 检查路径是否存在
+    print("正在删除目录:", folder_path)
+    if not os.path.exists(folder_path):
+        print("目录不存在:", folder_path)
+        return
+
+    # 遍历文件夹中的所有内容
+    for item in os.listdir(folder_path):
+        item_path = os.path.join(folder_path, item)
+        # 如果是文件，则删除
+        if os.path.isfile(item_path):
+            os.remove(item_path)
+            print("已删除文件:", item_path)
+        # 如果是文件夹，则递归调用该函数
+        elif os.path.isdir(item_path):
+            recursive_remove(item_path)  # 递归删除子文件夹
+            os.rmdir(item_path)  # 删除空的子文件夹
+            print("已删除文件夹:", item_path)
+
+    # 最后删除空的目标文件夹
+    os.rmdir(folder_path)
+    print("已删除文件夹:", folder_path)

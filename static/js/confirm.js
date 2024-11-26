@@ -12,6 +12,10 @@ function confirmNotification(className, notificationId, button) {
         return response.json();
     })
     .then(data => {
+        if (data.message !== "success" ){
+            alert(data.message);
+            return;
+        }
         button.style.backgroundColor = "#4CAF50"; // 将按钮颜色更改为绿色
         button.innerText = "已确认收到通知"; // 更改按钮文本
         button.setAttribute("onclick", `disconfirmNotification('<class>', <notification>, this)`); // 更新事件处理函数
@@ -35,6 +39,10 @@ function disconfirmNotification(className, notificationId, button) {
         return response.json();
     })
     .then(data => {
+        if (data.message !== "success" ){
+            alert(data.message);
+            return;
+        }
         button.style.backgroundColor = "#AF4C50"; // 将按钮颜色更改为红色
         button.innerText = "请确认收到通知"; // 更改按钮文本
         button.setAttribute("onclick", `confirmNotification('<class>', <notification>, this)`); // 更新事件处理函数

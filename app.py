@@ -1,8 +1,8 @@
-from flask import Flask, jsonify, render_template, session, redirect, url_for, request, make_response, send_from_directory
+from flask import Flask, send_file, jsonify, render_template, session, redirect, url_for, request, make_response, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 import random
 from init import app, db
-from core import Person, Class, Notification, Html_Error, Html_index, send_verify, send_warning, is_valid_email, is_valid_username, is_valid_password, parse_xls, is_valid_input_str
+from core import Person, Class, Notification, Html_Error, Html_index, send_verify, send_warning, is_valid_email, is_valid_username, is_valid_password, parse_xls, is_valid_input_str, recursive_remove
 import traceback
 import os
 from time import sleep
@@ -75,19 +75,31 @@ def class_page(class_id):
 
 
 @app.route("/class/<class_id>/confirm/<notification_id>", methods=["POST"])
+@if_login
 def confirm_notification(class_id, notification_id):
-    # 处理确认逻辑
-    # 更新数据库中该 notification 的确认状态
-    # ...
-    return jsonify({"message": "确认状态已更新"})
+    notification = Notification.query.filter_by(id=notification_id).first()  # 获取通知信息
+    people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
+    class_ = Class.query.filter_by(id=class_id).first()  # 获取课程信息
+    if str(people.id) not in class_.students.split(",") + class_.administrators.split(","):
+        return jsonify({"message": "你没有权限确认通知"})
+    if class_id != str(class_.id):
+        return jsonify({"message": "通知与课程不匹配"})
+    notification.confirm(people)
+    return jsonify({"message": "success"})
 
 
 @app.route("/class/<class_id>/disconfirm/<notification_id>", methods=["POST"])
+@if_login
 def disconfirm_notification(class_id, notification_id):
-    # 处理取消确认逻辑
-    # 更新数据库中该 notification 的确认状态
-    # ...
-    return jsonify({"message": "确认状态已取消"})
+    notification = Notification.query.filter_by(id=notification_id).first()  # 获取通知信息
+    people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
+    class_ = Class.query.filter_by(id=class_id).first()  # 获取课程信息
+    if str(people.id) not in class_.students.split(",") + class_.administrators.split(","):
+        return jsonify({"message": "你没有权限取消确认通知"})
+    if class_id != str(class_.id):
+        return jsonify({"message": "通知与课程不匹配"})
+    notification.disconfirm(people)
+    return jsonify({"message": "success"})
 
 
 @app.route("/class/<int:class_id>/schedule")
@@ -149,10 +161,10 @@ def class_write_notification(class_id):
             confirmeds = class_.students + "," + class_.administrators
         if need_submit:
             file_path = os.path.join("data", "submissions", str(random.randint(100000, 999999)))
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            os.makedirs(file_path, exist_ok=True)
         else:
-            file_path = ""
-        notification_id = Notification.new(title, content, deadline, confirmeds, unconfirmeds, file_path, class_.id)
+            file_path = "no_file_path"
+        Notification.new(title, content, deadline, confirmeds, unconfirmeds, file_path, class_.id)
         db.session.commit()
         return redirect("/class/" + str(class_id))  # 重定向到课程页面
     people = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
@@ -189,6 +201,89 @@ def submit(passkey):
         widget = open("templates/submit.html", "r", encoding="utf-8").read()
         html = Html_index(people, widget)
         return html.get_html()  # 返回提交页面
+
+
+@app.route("/file_submit/<path:file_dir>/<id>", methods=["GET", "POST"])
+@if_login
+def file_submit(file_dir, id):
+    file_dir += "/" + id
+    person = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
+    if not os.path.exists(file_dir):
+        err = Html_Error("非法文件路径", "不要随意访问文件")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    if file_dir.split("/")[1] != "submissions":
+        err = Html_Error("非法文件路径", "不要随意访问文件")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    if request.method == "POST":
+        file = request.files["file"]
+        file.save(file_dir + "/" + person.name + "_" + str(person.id) + "_-_" + file.filename)
+        return redirect("/")
+    widget = open("templates/submit_files.html", "r", encoding="utf-8").read()
+    html = Html_index(person, widget)
+    return html.get_html()  # 返回文件提交页面
+
+
+@app.route("/download_file_from_notification/<notification_id>")
+@if_login
+def download_file_from_notification(notification_id):
+    notification = Notification.query.filter_by(id=notification_id).first()  # 获取通知信息
+    if not notification:
+        err = Html_Error("通知不存在", "通知不存在")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    class_ = Class.query.filter_by(id=notification.class_id).first()  # 获取课程信息
+    if not class_:
+        err = Html_Error("课程不存在", "课程不存在")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    if str(session["id"]) not in class_.administrators.split(","):
+        err = Html_Error("权限不足", "你没有权限下载文件")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    if not os.path.exists(notification.file_path):
+        err = Html_Error("文件不存在", "文件不存在")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    file_dir = notification.file_path
+
+    # 定义压缩包的名称
+    zip_file_name = "submission.zip"  # 这里可以自定义为你想要的名称
+    zip_file_path = os.path.join(file_dir, zip_file_name)  # 将 ZIP 文件保存在 file_dir 的同一目录下
+
+    # 如果压缩包已经存在，先删除它
+    try:
+        os.remove(zip_file_path)
+    except FileNotFoundError:
+        pass
+
+    import shutil
+
+    # 压缩文件夹
+    shutil.make_archive(os.path.splitext(zip_file_path)[0], "zip", file_dir)
+
+    # 创建响应并发送 ZIP 文件
+    response = send_file(zip_file_path, as_attachment=True)
+    response.headers["Content-Disposition"] = "attachment; filename=" + os.path.basename(zip_file_path)
+    return response
+
+
+@app.route("/class/<class_id>/delete_notification/<notification_id>")
+@if_login
+def delete_notification(class_id, notification_id):
+    class_ = Class.query.filter_by(id=class_id).first()  # 获取课程信息
+    if not class_:
+        err = Html_Error("课程不存在", "课程不存在")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    notification = Notification.query.filter_by(id=notification_id).first()  # 获取通知信息
+    if not notification:
+        err = Html_Error("通知不存在", "通知不存在")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    if str(notification.class_id) != str(class_id):
+        err = Html_Error("通知与课程不匹配", "通知与课程不匹配")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    if str(session["id"]) not in class_.administrators.split(","):
+        err = Html_Error("权限不足", "你没有权限删除通知")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+    recursive_remove(notification.file_path)
+    db.session.delete(notification)
+    db.session.commit()
+    return redirect("/class/" + str(class_id))  # 重定向到课程页面
 
 
 @app.route("/create_class", methods=["GET", "POST"])
@@ -297,6 +392,7 @@ def login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
+        print(username, password)
         person = Person.query.filter_by(username=username, password=password).first()
         if person:  # 如果用户名和密码正确
             id = person.id  # 获取用户 ID
