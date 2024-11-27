@@ -25,3 +25,9 @@
 pandas库可用版本: 2.1.4+dfsg
 
 后续可能会不兼容
+
+## 项目状态
+
+该项目还在开发中，目前可以使用。
+
+详情请见：[开发分支](https://github.com/zpb911km/monitorTool/tree/dev)
