@@ -4,38 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" type="text/css" href="/static/css/style.css">
-    <title>登录</title>
+    <title>注册</title>
 </head>
 <body>
     <canvas id="myCanvas" class="myCanvas"></canvas>
     <script src="{{ url_for('static', filename='js/rain.js') }}"></script>
     <div class="login-wrapper">
-        <div class="header">登录</div>
-        <form id="loginForm" method="POST">
+        <div class="header">注册</div>
+        <h6>请查看邮箱以获取验证码</h6>
+        <form id="registerForm" method="post">
             <div class="form-wrapper">
                 <input type="text" name="username" placeholder="用户名" class="input-item" required>
                 <input id="password" type="password" name="password" placeholder="密码" class="input-item" required>
-                <button id="submitBtn" type="button" class="btn">登录</button> <!-- 将类型改为button -->
+                <input type="number" name="verify-code" placeholder="邮箱验证码" class="input-item" required>
+                <button id="submitBtn" type="button" class="btn">注册</button>
             </div>
             <div class="msg">
-                没有账户?
-                <a href="/register">注册</a>
+                已有账户?
+                <a href="/login">登录</a>
             </div>
             <div class="msg">
-                忘记密码?
-                <a href="/reset">重置用户名和密码</a>
+                这是什么东西???
+                <a href="/about">了解一下</a>
             </div>
         </form>
         
     </div>
     <script>
         document.getElementById('submitBtn').addEventListener('click', async function() {
+            const password = document.getElementById('password').value;
+            if (password.length < 8) {
+                alert('密码长度必须大于等于 8 位');
+                return;
+            }
             const result = await hashPassword();
             if (result) {
-                document.getElementById('loginForm').submit(); // 哈希化成功后提交表单
+                document.getElementById('registerForm').submit(); // 哈希化成功后提交表单
             }
         });
-
+    
         async function hashPassword() {
             const passwordField = document.getElementById('password');
             const password = passwordField.value;
@@ -52,9 +59,11 @@
             const button = document.getElementById('submitBtn');
             button.disabled = true; // 禁用提交按钮，防止多次提交
             button.innerHTML = '密码校验中...';
-
+            
             return true; // 让表单提交
         }
     </script>
+    
+        
 </body>
 </html>

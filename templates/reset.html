@@ -4,30 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" type="text/css" href="/static/css/style.css">
-    <title>注册</title>
+    <title>重置</title>
 </head>
 <body>
     <canvas id="myCanvas" class="myCanvas"></canvas>
     <script src="{{ url_for('static', filename='js/rain.js') }}"></script>
     <div class="login-wrapper">
-        <div class="header">注册</div>
+        <div class="header">重置</div>
         <form method="post">
             <div class="form-wrapper">
                 <input type="text" name="name" placeholder="真实姓名" class="input-item" required>
                 <input type="number" name="id" placeholder="学号/工号" class="input-item" required>
-                <input type="email" name="email" placeholder="邮箱" class="input-item" required>
                 <button type="submit" class="btn">下一步</button>
             </div>
-            <div class="msg">
-                已有账户?
-                <a href="/login">登录</a>
-            </div>
-            <div class="msg">
-                这是什么东西???
-                <a href="/about">了解一下</a>
-            </div>
         </form>
-        
     </div>
 </body>
 </html>

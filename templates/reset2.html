@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    <title>重置</title>
+</head>
+<body>
+    <canvas id="myCanvas" class="myCanvas"></canvas>
+    <script src="{{ url_for('static', filename='js/rain.js') }}"></script>
+    <div class="login-wrapper">
+        <div class="header">重置</div>
+        <h6>请查看邮箱以获取验证码</h6>
+        <form method="post">
+            <div class="form-wrapper">
+                <input type="text" name="username" placeholder="用户名" class="input-item" required>
+                <input type="password" name="password" placeholder="密码" class="input-item" required>
+                <input type="number" name="verify-code" placeholder="邮箱验证码" class="input-item" required>
+                <button type="submit" class="btn">确认修改</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
