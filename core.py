@@ -27,11 +27,10 @@ class Person(db.Model):
 
     def login_ip(self, ip: str) -> None:
         warn = False
-        if ", " in self.ips:
+        if self.ips == "":
             self.ips = ip
-            warn = True
-        elif ip not in self.ips.split(", "):
-            self.ips += f", {ip}"
+        elif ip not in self.ips:
+            self.ips += "," + ip
             warn = True
         db.session.commit()
         return warn
@@ -299,6 +298,8 @@ class Class(db.Model):
             else:
                 schedule = merge_list(schedule, admin.raw_courses_name())
         widget = ""
+        if len(schedule) == 0:
+            return "暂无课表, 请先导入"
         for w in range(20):
             widget += "第" + str(w + 1) + "周<br />" + '<table border="1" width="100%">'
             widget += '<tr><th width="14.2857142857%">星期日</th><th width="14.2857142857%">星期一</th><th width="14.2857142857%">星期二</th><th width="14.2857142857%">星期三</th><th width="14.2857142857%">星期四</th><th width="14.2857142857%">星期五</th><th width="14.2857142857%">星期六</th></tr>'

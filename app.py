@@ -7,6 +7,7 @@ import traceback
 import os
 from time import sleep
 from functools import wraps
+import datetime
 
 en_key = ""  # 加密密钥
 
@@ -38,6 +39,8 @@ def if_login(func):
         if "id" not in session:  # 如果用户未登录
             return redirect("/login")  # 重定向到登录页面
         if session["id"] != id:  # 如果用户 ID 不匹配
+            return redirect("/login")  # 重定向到登录页面
+        if Person.query.filter_by(id=id).first() is None:  # 如果用户不存在
             return redirect("/login")  # 重定向到登录页面
         if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
             return redirect("/login")  # 重定向到密码重置页面
@@ -207,6 +210,12 @@ def submit(passkey):
 @if_login
 def file_submit(file_dir, id):
     file_dir += "/" + id
+    notification = Notification.query.filter_by(file_path=file_dir).first()  # 获取通知信息
+    if notification:
+        deadline = notification.deadline
+        if deadline and deadline < datetime.datetime.now():
+            err = Html_Error("提交失败", "提交截止时间已过")  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
     person = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
     if not os.path.exists(file_dir):
         err = Html_Error("非法文件路径", "不要随意访问文件")  # 显示错误信息
@@ -243,7 +252,7 @@ def download_file_from_notification(notification_id):
     file_dir = notification.file_path
 
     # 定义压缩包的名称
-    zip_file_name = "submission.zip"  # 这里可以自定义为你想要的名称
+    zip_file_name = f"{class_.name}_{notification.title}.zip"  # 这里可以自定义为你想要的名称
     zip_file_path = os.path.join(file_dir, zip_file_name)  # 将 ZIP 文件保存在 file_dir 的同一目录下
 
     # 如果压缩包已经存在，先删除它
@@ -419,7 +428,7 @@ def login():
         if generate_login_key(id) == key:  # 如果登录密钥正确
             session["id"] = id  # 将用户 ID 存储在会话中
             ips = Person.query.filter_by(id=id).first().ips
-            if request.remote_addr in ips.split(", "):  # 如果登录 IP 地址在 IP 地址列表中
+            if request.remote_addr in ips.split(","):  # 如果登录 IP 地址在 IP 地址列表中
                 return redirect("/")  # 重定向到主页
     except Exception:
         pass  # 忽略错误
@@ -513,7 +522,7 @@ def register():
         send_verify(email, name, random_code)  # 发送验证码邮件
         return redirect("/register2")  # 重定向到注册页面 2
     else:
-        if "id" in session or request.cookies.get("pass_key"):  # 如果已登录
+        if request.cookies.get("pass_key"):  # 如果已登录
             return redirect("/login")  # 重定向到登录页面
         else:
             return render_template("register.html")  # 渲染注册页面 1
@@ -615,6 +624,11 @@ def rm_user():
     else:
         err = Html_Error("确认删除账户吗？", '再问你一遍,确认删除账户吗？<form method="post"><input class="btn" type="submit" value="确认"></form>')  # 显示确认删除账户信息页面
         return err.get_html()  # 返回确认删除账户信息页面
+
+
+@app.route("/about")
+def about():
+    return redirect("https://github.com/zpb911km/monitorTool")
 
 
 @app.errorhandler(Exception)

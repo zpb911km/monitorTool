@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script>
     <title>登录</title>
 </head>
 <body>
@@ -28,6 +29,7 @@
         </form>
         
     </div>
+    
     <script>
         document.getElementById('submitBtn').addEventListener('click', async function() {
             const result = await hashPassword();
@@ -36,17 +38,37 @@
             }
         });
 
+        async function hash(input) {
+            return new Promise((resolve) => {
+                let hashValue = 1n; // 更大的初始值
+                const prime1 = 1532093n;  // 选择第一个质数
+                const prime2 = 7304107n;  // 选择第二个质数
+
+                for (let i = 0; i < input.length; i++) {
+                    hashValue = (hashValue * prime1 + BigInt(input.charCodeAt(i))); // 使用质数和模运算
+                    hashValue = (hashValue * prime2); // 进一步增加复杂性
+                    hashValue = hashValue & 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn;
+                }
+
+                // 防止哈希值溢出
+                hashValue = hashValue & 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn;
+
+                // 将最终哈希值转换为16进制字符串
+                let hashHex = hashValue.toString(16);
+
+                // 确保输出长度为64位（16个16进制字符），不足时前面补零
+                const finalHash = hashHex.padStart(64, '0').slice(-64); // 截取到64位
+                resolve(finalHash); // 返回结果
+            });
+        }
+
         async function hashPassword() {
             const passwordField = document.getElementById('password');
             const password = passwordField.value;
-        
-            // 使用 SubtleCrypto 计算 SHA-256 哈希值
-            const encoder = new TextEncoder();
-            const data = encoder.encode(password);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data); // 计算哈希值
-            const hashArray = Array.from(new Uint8Array(hashBuffer)); // 转换成字节数组
-            const hashHex = hashArray.map(b => ('00' + b.toString(16)).slice(-2)).join(''); // 转换为十六进制字符串
-        
+
+            // 使用自定义的异步 hash 函数
+            const hashHex = await hash(password); // 获取私有哈希值
+
             passwordField.value = hashHex; // 替换原密码为哈希值
             
             const button = document.getElementById('submitBtn');
