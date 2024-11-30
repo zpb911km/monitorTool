@@ -634,7 +634,7 @@ def about():
 @app.errorhandler(Exception)
 def handle_error(e):
     # 使用traceback格式化错误信息
-    tb_lines = traceback.format_exception(type(e), e, e.__traceback__)  # 正确用位置参数
+    tb_lines = traceback.format_exception(type(e), e, e.__traceback__)
     for n, line in enumerate(tb_lines):
         if "web_server" in line:
             tb_lines = tb_lines[n:]
@@ -652,4 +652,4 @@ def handle_error(e):
 if __name__ == "__main__":
     with app.app_context():  # 确保在应用上下文中运行
         create_tables()  # 创建数据库
-    app.run(host="0.0.0.0", port=65506, debug=True)
+    app.run(host="0.0.0.0", port=65506, debug=False)

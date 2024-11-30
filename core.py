@@ -288,7 +288,8 @@ class Class(db.Model):
             if len(schedule) == 0:
                 schedule = student.raw_courses_name()
             else:
-                schedule = merge_list(schedule, student.raw_courses_name())
+                if len(student.raw_courses_name()) != 0:
+                    schedule = merge_list(schedule, student.raw_courses_name())
         for admin_id in self.administrators.split(","):
             admin = Person.query.filter_by(id=admin_id).first()
             if admin is None:
