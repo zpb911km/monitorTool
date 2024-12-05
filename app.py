@@ -315,6 +315,8 @@ def create_class():
         while Class.query.filter_by(id=class_id).first():  # 防止 ID 重复
             class_id = class_id + 1
         class_members = members.split("\n")
+        if people.id not in class_members:
+            administrators = f' {people.id}\n{administrators}'
         class_administrators = administrators.split("\n")
         member_remove = []
         for member in class_members:
@@ -340,10 +342,11 @@ def feedback():
             err = Html_Error("内容不能为空", '内容不能为空<a href="/feedback">返回反馈</a>')  # 显示错误信息
             return err.get_html()  # 返回错误信息页面
         with open("data/feedback.txt", "a", encoding="utf-8") as f:
-            f.write(people.name + ":" + content + "\n")  # 写入文件
+            f.write(people.username + ":" + people.name + ":" + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ":" + content + "\n")  # 写入文件
+        return redirect("/")
     else:
-        page = """<textarea class="feedback-input" type="text" name="content" placeholder="请输入反馈内容"></textarea>
-        <button type="submit" class="btn">提交</button><script>alert("感谢您的反馈,我们会尽快处理")</script>"""
+        page = """<form method="post" class="feedback-form"><textarea class="feedback-input" type="text" name="content" placeholder="请输入反馈内容"></textarea>
+        <button type="submit" class="btn">提交</button><form>"""
         html = Html_index(people, page)
         return html.get_html()  # 返回反馈页面
 
@@ -652,4 +655,4 @@ def handle_error(e):
 if __name__ == "__main__":
     with app.app_context():  # 确保在应用上下文中运行
         create_tables()  # 创建数据库
-    app.run(host="0.0.0.0", port=65506, debug=False)
+    app.run(host="0.0.0.0", port=65506, debug=True)

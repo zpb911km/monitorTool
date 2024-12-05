@@ -295,3 +295,11 @@ details {
     background-color: transparent;
     color: #ffffff;
 }
+
+.feedback-form {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}

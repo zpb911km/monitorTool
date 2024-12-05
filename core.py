@@ -297,7 +297,8 @@ class Class(db.Model):
             if len(schedule) == 0:
                 schedule = admin.raw_courses_name()
             else:
-                schedule = merge_list(schedule, admin.raw_courses_name())
+                if len(admin.raw_courses_name()) != 0:
+                    schedule = merge_list(schedule, admin.raw_courses_name())
         widget = ""
         if len(schedule) == 0:
             return "暂无课表, 请先导入"
@@ -392,30 +393,52 @@ class Class(db.Model):
 
     def update_members(self, administrators: list[str], students: list[str]) -> None:
         for admin in administrators:
+            try:
+                int(admin.split(" ")[1])
+            except Exception:
+                continue
             person = Person.query.filter_by(id=int(admin.split(" ")[1])).first()
             if person is not None:
-                person.classes = person.classes.replace(self.id + ",", "").replace(self.id, "")
+                if person.classes is not None:
+                    person.classes = person.classes.replace(self.id + ",", "").replace(self.id, "")
+                else:
+                    person.classes = self.id + ","
         for member in students:
+            try:
+                int(menber.split(" ")[1])
+            except Exception:
+                continue
+            if member == "":
+                continue
             person = Person.query.filter_by(id=int(member.split(" ")[1])).first()
             if person is not None:
-                person.classes = person.classes.replace(self.id + ",", "").replace(self.id, "")
+                if person.classes is not None:
+                    person.classes = person.classes.replace(self.id + ",", "").replace(self.id, "")
         admins = ",".join([admin_in.split(" ")[1].strip() for admin_in in administrators if admin_in != ""])
         members = ",".join([member_in.split(" ")[1].strip() for member_in in students if member_in != ""])
         unsynced = []
+        if admins == "":
+            raise ValueError("管理员不能为空")
         for admin in admins.split(","):
+            try:
+                int(admin)
+            except ValueError:
+                continue
             person = Person.query.filter_by(id=int(admin)).first()
             if person is not None:
                 if self.id not in person.classes.split(","):
                     person.classes += f"{self.id},"
             else:
                 unsynced.append(admin)
-        for member in members.split(","):
-            person = Person.query.filter_by(id=int(member)).first()
-            if person is not None:
-                if self.id not in person.classes.split(","):
-                    person.classes += f"{self.id},"
-            else:
-                unsynced.append(member)
+        if members != "":
+            for member in members.split(","):
+                person = Person.query.filter_by(id=int(member)).first()
+                if person is not None:
+                    if person.classes is not None:
+                        if self.id not in person.classes.split(","):
+                            person.classes += f"{self.id},"
+                else:
+                    unsynced.append(member)
         unsynced_peoples = ",".join(unsynced)
         self.administrators = admins
         self.students = members
