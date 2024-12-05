@@ -405,7 +405,7 @@ class Class(db.Model):
                     person.classes = self.id + ","
         for member in students:
             try:
-                int(menber.split(" ")[1])
+                int(member.split(" ")[1])
             except Exception:
                 continue
             if member == "":
