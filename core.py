@@ -235,7 +235,10 @@ class Class(db.Model):
     unsynced_peoples = db.Column(db.Text)  # 以逗号分隔的未同步人员 ID 字符串
 
     def sync_to_people(self) -> None:
-        ids = self.unsynced_peoples.split(",")
+        ids = []
+        for id in self.unsynced_peoples.split(","):
+            if id.isdigit() and id != "" and id not in ids:
+                ids.append(id)
         id_done = []
         for id in ids:
             person = Person.query.filter_by(id=id).first()
@@ -251,14 +254,23 @@ class Class(db.Model):
         for id in id_done:
             ids.remove(id)
         self.unsynced_peoples = ",".join(ids)
+        admin_ids = []
         for admin_id in self.administrators.split(","):
             if admin_id in self.students:
                 self.students = self.students.replace(admin_id + ",", "").replace(admin_id, "")
+            if admin_id.isdigit() and admin_id != "" and admin_id not in admin_ids:
+                admin_ids.append(admin_id)
+        member_ids = []
+        for member_id in self.students.split(","):
+            if member_id.isdigit() and member_id != "" and member_id not in member_ids:
+                member_ids.append(member_id)
+        self.administrators = ",".join(admin_ids)
+        self.students = ",".join(member_ids)
         db.session.commit()
 
-    def new(id: str, name: str, administrators: list[str], students: list[str]) -> bool:
-        admins = ",".join([admin_in.split(" ")[1].strip() for admin_in in administrators if admin_in != ""])
-        members = ",".join([member_in.split(" ")[1].strip() for member_in in students if member_in != ""])
+    def new(id: str, name: str, administrators: list[int], students: list[int]) -> bool:
+        admins = ",".join([str(admin) for admin in administrators])
+        members = ",".join([str(member) for member in students])
         unsynced = []
         for admin in admins.split(","):
             person = Person.query.filter_by(username=admin).first()
@@ -365,7 +377,8 @@ class Class(db.Model):
                 if student:
                     students.append(student.name + " " + str(student.id))
                 else:
-                    students.append(f"未登录 {student_id}")
+                    if student_id.isdigit():
+                        students.append(f"未登录 {student_id}")
             admins = []
             for admin_id in self.administrators.split(","):
                 admin = Person.query.filter_by(id=admin_id).first()
@@ -392,38 +405,56 @@ class Class(db.Model):
             return err.get_html()  # 返回错误信息页面
 
     def update_members(self, administrators: list[str], students: list[str]) -> None:
+        admin_ids = []
         for admin in administrators:
-            try:
-                int(admin.split(" ")[1])
-            except Exception:
+            if admin == "":
                 continue
-            person = Person.query.filter_by(id=int(admin.split(" ")[1])).first()
+            if " " in admin:
+                try:
+                    int(admin.split(" ")[1])
+                except ValueError:
+                    continue
+                admin_ids.append(int(admin.split(" ")[1]))
+            else:
+                try:
+                    int(admin)
+                except ValueError:
+                    continue
+                admin_ids.append(int(admin))
+        member_ids = []
+        for member in students:
+            if member == "":
+                continue
+            if " " in member:
+                try:
+                    int(member.split(" ")[1])
+                except ValueError:
+                    continue
+                member_ids.append(int(member.split(" ")[1]))
+            else:
+                try:
+                    int(member)
+                except ValueError:
+                    continue
+                member_ids.append(int(member))
+        for admin in admin_ids:
+            person = Person.query.filter_by(id=admin).first()
             if person is not None:
                 if person.classes is not None:
                     person.classes = person.classes.replace(self.id + ",", "").replace(self.id, "")
                 else:
                     person.classes = self.id + ","
-        for member in students:
-            try:
-                int(member.split(" ")[1])
-            except Exception:
-                continue
-            if member == "":
-                continue
-            person = Person.query.filter_by(id=int(member.split(" ")[1])).first()
+        for member in member_ids:
+            person = Person.query.filter_by(id=member).first()
             if person is not None:
                 if person.classes is not None:
                     person.classes = person.classes.replace(self.id + ",", "").replace(self.id, "")
-        admins = ",".join([admin_in.split(" ")[1].strip() for admin_in in administrators if admin_in != ""])
-        members = ",".join([member_in.split(" ")[1].strip() for member_in in students if member_in != ""])
+        admins = ",".join([str(admin) for admin in admin_ids])
+        members = ",".join([str(member) for member in member_ids])
         unsynced = []
         if admins == "":
             raise ValueError("管理员不能为空")
         for admin in admins.split(","):
-            try:
-                int(admin)
-            except ValueError:
-                continue
             person = Person.query.filter_by(id=int(admin)).first()
             if person is not None:
                 if self.id not in person.classes.split(","):
@@ -501,7 +532,6 @@ class Notification(db.Model):
         widget += "<p>" + self.content.replace("\n", "<br>").replace("\r", "") + "</p>\n"
         widget += "<p>截止时间：" + self.str_deadline() + "</p>\n"
         if self.file_path != "no_file_path":
-            print(self.file_path)
             widget += f'<a href="/file_submit/{self.file_path}">文件点此处提交</a>'
         if people is not None:
             widget += '<div style="text-align: right; padding-top: 10px;">'
@@ -578,6 +608,8 @@ class Html_index:
 
     def get_index_html(self) -> str:
         widget = ""
+        if self.user.courses is None:
+            widget += "<div id='warning' style='text-align: center;'><p>请先更新个人课表</p><a href='/update_schedule'>点此更新</a></div>"
         for class_ in self.classes:
             widget += Notification.get_html_widget(class_, self.user)
         self.main_area = widget

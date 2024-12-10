@@ -247,7 +247,7 @@ def download_file_from_notification(notification_id):
         err = Html_Error("权限不足", "你没有权限下载文件")  # 显示错误信息
         return err.get_html()  # 返回错误信息页面
     if not os.path.exists(notification.file_path):
-        err = Html_Error("文件不存在", "文件不存在")  # 显示错误信息
+        err = Html_Error("文件不存在", "请重新投放通知")  # 显示错误信息
         return err.get_html()  # 返回错误信息页面
     file_dir = notification.file_path
 
@@ -260,6 +260,11 @@ def download_file_from_notification(notification_id):
         os.remove(zip_file_path)
     except FileNotFoundError:
         pass
+
+    files = os.listdir(file_dir)
+    if len(files) == 0:
+        err = Html_Error("文件为空", "没有人提交文件")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
 
     import shutil
 
@@ -308,22 +313,26 @@ def create_class():
         else:
             err = Html_Error("输入错误", '含有非法字符<a href="/create_class">返回创建课程</a>')  # 显示错误信息
             return err.get_html()  # 返回错误信息页面
-        if not class_name or not members or not administrators:
-            err = Html_Error("不能为空", '课程名称与成员与管理员均不能为空<a href="/create_class">返回创建课程</a>')  # 显示错误信息
+        if not class_name:
+            err = Html_Error("不能为空", '课程名称不能为空<a href="/create_class">返回创建课程</a>')  # 显示错误信息
             return err.get_html()  # 返回错误信息页面
         class_id = random.randint(100000, 999999)  # 生成随机课程 ID
         while Class.query.filter_by(id=class_id).first():  # 防止 ID 重复
             class_id = class_id + 1
-        class_members = members.split("\n")
-        if people.id not in class_members:
-            administrators = f' {people.id}\n{administrators}'
-        class_administrators = administrators.split("\n")
-        member_remove = []
-        for member in class_members:
-            if member in class_administrators:
-                member_remove.append(member)
-        for member in member_remove:
-            class_members.remove(member)
+        try:
+            class_administrators = [int(people.id)]
+            class_members = []
+            if administrators != "":
+                for i in administrators.split("\n"):
+                    if int(i) not in class_administrators:
+                        class_administrators.append(int(i))
+            if members != "":
+                for i in members.split("\n"):
+                    if int(i) not in class_members and int(i) not in class_administrators:
+                        class_members.append(int(i))
+        except ValueError:
+            err = Html_Error("输入错误", '请输入正确的学号，并用换行分隔不同学号<a href="/create_class">返回创建课程</a>')  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
         Class.new(class_id, class_name, class_administrators, class_members)
         return redirect("/class/" + str(class_id))  # 重定向到课程页面
     widget = open("templates/create_class.html", "r", encoding="utf-8").read()
@@ -404,7 +413,6 @@ def login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
-        print(username, password)
         person = Person.query.filter_by(username=username, password=password).first()
         if person:  # 如果用户名和密码正确
             id = person.id  # 获取用户 ID

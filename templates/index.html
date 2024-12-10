@@ -1,41 +1,146 @@
 <!DOCTYPE html>
 <html lang="zh">
-    <head>
-        <meta charset="UTF-8">
-        <title>home</title>
-        <link rel="stylesheet" type="text/css" href="/static/css/style.css">
-    </head>
-    <body>
-        <header>
-            <div>
-                <span>当前用户: <!--name--></span>
-            </div>
-            <div>
-                <a href="/logout">退出登录</a>
-                |
-                <a href="/feedback">发送反馈</a>
-            </div>
-        </header>
-        <div style="display: flex; flex: 1;">
-            <div class="sidebar">
-                <nav>
-                    <ul style="padding: 0; margin: 0;">
-                        <li>
-                            <button class="sidebar-button" onclick="location.href='/'">首页</button>
-                        </li>
-                        <li>
-                            <button class="sidebar-button" onclick="location.href='/user'">个人课表</button>
-                        </li>
-                        <!--Class List-->
-                        <li>
-                            <button class="sidebar-button" onclick="location.href='/create_class'">新建班级</button>
-                        </li>
-                    </ul>
-                </nav>
-            </div>
-            <div class="content">
-                <!--Content-->
-            </div>
+<head>
+    <meta charset="UTF-8">
+    <title>home</title>
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    <style>
+        .collapsed {
+            width: 50px; /* 收起状态的宽度 */
+            transition: width 0.3s; /* 动画过渡效果 */
+        }
+
+        .expanded {
+            width: 25%; /* 展开状态的宽度 */
+            transition: width 0.3s; /* 动画过渡效果 */
+        }
+
+        .sidebar {
+            overflow: hidden; /* 隐藏溢出部分 */
+        }
+
+        .content-expanded {
+            width: 75%; /* 展开状态的内容宽度 */
+            transition: width 0.3s; /* 动画过渡效果 */
+        }
+
+        .content-collapsed {
+            width: calc(100% - 50px); /* 收起状态的内容宽度，减去侧边栏宽度 */
+            transition: width 0.3s; /* 动画过渡效果 */
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <span>当前用户: <!--name--></span>
         </div>
-    </body>
+        <div>
+            <a href="/logout">退出登录</a>
+            |
+            <a href="/feedback">发送反馈</a>
+        </div>
+    </header>
+    <div style="display: flex; flex: 1;">
+        <div class="sidebar expanded" id="sidebar"> <!-- 默认展开状态 -->
+            <nav id="sidebar-nav">
+                <div style="display: flex;justify-content: flex-end;">
+                    <button id="toggle-button" class="sidebar-button" style="display: none;">>收起侧边栏</button> <!-- 添加按钮 -->
+                </div>
+                <ul style="padding: 0; margin: 0; list-style: none;">
+                    <li>
+                        <button class="sidebar-button" onclick="location.href='/'">首页</button>
+                    </li>
+                    <li>
+                        <button class="sidebar-button" onclick="location.href='/user'">个人课表</button>
+                    </li>
+                    <!--Class List-->
+                    <li>
+                        <button class="sidebar-button" onclick="location.href='/create_class'">新建班级</button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+        <div id="content" class="content content-expanded"> <!-- 默认展开状态的内容 -->
+            <!--Content-->
+        </div>
+    </div>
+
+    <script>
+        const toggleButton = document.getElementById('toggle-button');
+        const sidebar = document.getElementById('sidebar');
+        const content = document.getElementById('content');
+        const sidebarButtons = document.querySelectorAll('.sidebar-button');
+
+        toggleButton.addEventListener('click', function() {
+            if (sidebar.classList.contains('expanded')) {
+                sidebar.classList.remove('expanded');
+                sidebar.classList.add('collapsed');
+                content.classList.remove('content-expanded');
+                content.classList.add('content-collapsed');
+
+                // 收起时，取按钮文本的第一个字符
+                sidebarButtons.forEach(button => {
+                    button.textContent = button.textContent.charAt(0);
+                });
+
+                toggleButton.textContent = toggleButton.textContent.charAt(0); // 收起时取第一个字符
+            } else {
+                sidebar.classList.remove('collapsed');
+                sidebar.classList.add('expanded');
+                content.classList.remove('content-collapsed');
+                content.classList.add('content-expanded');
+
+                // 使用 setTimeout 延迟更新按钮文本
+                setTimeout(() => {
+                    // 展开时恢复原文本
+                    sidebarButtons.forEach(button => {
+                        button.textContent = button.getAttribute('data-fulltext');
+                    });
+                    toggleButton.textContent = ">收起侧边栏"; // 展开时恢复原文本
+                }, 300); // 延迟的时间，与动画时长相同
+            }
+        });
+
+        sidebar.addEventListener('mouseenter', function() {
+            if (sidebar.classList.contains('collapsed')) {
+                sidebar.classList.remove('collapsed');
+                sidebar.classList.add('expanded');
+                content.classList.remove('content-collapsed');
+                content.classList.add('content-expanded');
+
+                // 展开时恢复原文本
+                sidebarButtons.forEach(button => {
+                    button.textContent = button.getAttribute('data-fulltext');
+                });
+                toggleButton.textContent = ">收起侧边栏"; // 展开时恢复原文本
+            }
+        });
+
+        sidebar.addEventListener('mouseleave', function() {
+            if (sidebar.classList.contains('expanded')) {
+                sidebar.classList.remove('expanded');
+                sidebar.classList.add('collapsed');
+                content.classList.remove('content-expanded');
+                content.classList.add('content-collapsed');
+
+                // 收起时，取按钮文本的第一个字符
+                sidebarButtons.forEach(button => {
+                    button.textContent = button.textContent.charAt(0);
+                });
+
+                toggleButton.textContent = toggleButton.textContent.charAt(0); // 收起时取第一个字符
+            }
+        });
+
+        // 在按钮上添加完全的文本，以便展开时恢复
+        sidebarButtons.forEach(button => {
+            button.setAttribute('data-fulltext', button.textContent);
+        });
+
+        setTimeout(() => {
+            toggleButton.click();
+        }, 600);
+    </script>
+</body>
 </html>
