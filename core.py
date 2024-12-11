@@ -670,7 +670,7 @@ def send_warning(to: str, name: str, ip: str):
     for person in all_people:
         if person.ips is not None:
             if ip in person.ips.split(", "):
-                users += f"{person.name}({person.username})\n"
+                users += f"{person.username}\n"
 
     head = "新地址登录警告"
     text = f"{name} 您好\n你的账户在 {ip} 登录，请注意安全。\n如非本人操作，请及时修改密码。\n其他从此ip登录的用户如下：\n{users}"

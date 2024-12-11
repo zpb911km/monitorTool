@@ -4,6 +4,8 @@ html {
     font-family: 'Helvetica Neue', Arial, sans-serif;
     color: #f2f2f2; /* 更加柔和的白色 */
     background-color: #1e2233; /* 深蓝色背景，增加层次感 */
+    margin: 0;
+    padding: 0;
 }
 
 body {
@@ -14,6 +16,8 @@ body {
     overflow: auto;
     scrollbar-width: 0;
     -ms-overflow-style: none;
+    margin: 0;
+    padding: 0;
 }
 
 /* 滚动条样式 */
@@ -70,6 +74,15 @@ body::-webkit-scrollbar-thumb {
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.form-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 5px;
+    box-sizing: border-box;
 }
 
 /* 输入框样式 */
@@ -236,4 +249,28 @@ summary {
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+.collapsed {
+    width: 50px; /* 收起状态的宽度 */
+    transition: width 0.3s; /* 动画过渡效果 */
+}
+
+.expanded {
+    width: 25%; /* 展开状态的宽度 */
+    transition: width 0.3s; /* 动画过渡效果 */
+}
+
+.sidebar {
+    overflow: hidden; /* 隐藏溢出部分 */
+}
+
+.content-expanded {
+    width: 75%; /* 展开状态的内容宽度 */
+    transition: width 0.3s; /* 动画过渡效果 */
+}
+
+.content-collapsed {
+    width: calc(100% - 50px); /* 收起状态的内容宽度，减去侧边栏宽度 */
+    transition: width 0.3s; /* 动画过渡效果 */
 }
