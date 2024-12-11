@@ -5,7 +5,7 @@ function get_file() {
         document.querySelector("label[name='file_name']").innerText = file_name || "还没有选择文件";
     });
 }
-function submitForm() {
+async function submitForm() {
     // 检查文件输入是否为空
     if (document.getElementsByName("file")[0].value == "") {
         alert("请选择文件");
@@ -26,4 +26,9 @@ function submitForm() {
     document.getElementsByName("submit")[0].disabled = true;
     document.getElementsByName("submit")[0].innerText = "上传中...,请稍后...";
     document.getElementsByName("submitAction")[0].click();
+
+    // 使用setTimeout来显示上传成功的提示
+    setTimeout(() => {
+        alert("上传完毕");
+    }, 0);
 }

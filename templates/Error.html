@@ -1,39 +1,74 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title><!--Err_title--></title>
-        <style>
-            html {
-                background-color: black;
-                color: white;
-            }
-            body {
-                display: flex;
-                justify-content: center; /* 横向居中 */
-                align-items: center;    /* 纵向居中 */
-                height: 100vh;         /* 使 body 高度占满整个视口 */
-                margin: 0;             /* 清除默认的 margin */
-            }
-            .error-container {
-                text-align: left;      /* 文字靠左 */
-                width: 50%;          /* 设置一个固定宽度 */
-                padding: 100px;         /* 内边距 */
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* 添加阴影效果 */
-                border: 100px solid #ff0000; /* 边框样式 */
-                border-radius: 5px;    /* 边框圆角 */
-                font-size: 25px;      /* 字体大小 */
-            }
-            a {
-                color: rgb(55, 208, 255);
-                text-decoration: underline;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="error-container">
-            <h1><!--Err_title--></h1>
-            <p><!--Err_content--></p>
-            <a href='/'>返回主页面</a>
-        </div>
-    </body>
+<head>
+    <title><!--Err_title--></title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"> <!-- 引入字体 -->
+    <style>
+        html {
+            background-color: black;
+            color: white;
+        }
+        body {
+            display: flex;
+            justify-content: center; /* 横向居中 */
+            align-items: center;    /* 纵向居中 */
+            height: 100vh;         /* 使 body 高度占满整个视口 */
+            margin: 0;             /* 清除默认的 margin */
+            overflow: hidden;      /* 防止滚动条出现 */
+        }
+        canvas {
+            position: absolute;     /* 绝对定位 */
+            top: 0;
+            left: 0;
+            z-index: 1;            /* 确保 canvas 在最底层 */
+        }
+        .error-container {
+            text-align: left;      /* 文字靠左 */
+            width: 50%;            /* 设置一个固定宽度 */
+            padding: 50px;            /* 内边距 */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* 添加阴影效果 */
+            border: 50px solid #f00;             /* 边框样式 */
+            border-radius: 5px;    /* 边框圆角 */
+            font-size: 25px;       /* 字体大小 */
+            z-index: 2;            /* 确保文字在上层 */
+        }
+        a {
+            color: rgba(223, 148, 44, 0.783);
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="myCanvas"></canvas>
+    <script>
+        const width = (document.getElementById("myCanvas").width = window.innerWidth);
+        const height = (document.getElementById("myCanvas").height = window.innerHeight);
+        const ctx = document.getElementById("myCanvas").getContext("2d");
+        const arr = Array(Math.ceil(width / 10)).fill(height); // 从底部开始
+        const str = "<!--Err_title-->".split(""); // 修改为随机字符
+        ctx.font = "10px 'Press Start 2P'"; // 设置字体
+
+        function rain() {
+            ctx.fillStyle = "rgba(0,0,0,0.05)";
+            ctx.fillRect(0, 0, width, height);
+            ctx.fillStyle = "#ff0000"; // 将字符颜色设置为红色
+            arr.forEach(function (value, index) {
+                ctx.fillText(
+                    str[Math.floor(Math.random() * str.length)],
+                    index * 10,
+                    value
+                );
+                arr[index] =
+                    value <= 0 || value > 8888 * Math.random() ? height : value - 10; // 运动方向向上
+            });
+        }
+
+        setInterval(rain, 60);
+    </script>
+    <div class="error-container">
+        <h1><!--Err_title--></h1>
+        <p><!--Err_content--></p>
+        <a href='javascript:history.back(-1)'>返回</a>
+    </div>
+</body>
 </html>

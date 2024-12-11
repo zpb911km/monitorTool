@@ -12,14 +12,62 @@
     <div class="login-wrapper">
         <div class="header">重置</div>
         <h6>请查看邮箱以获取验证码</h6>
-        <form method="post">
+        <form id="reset-form" method="post">
             <div class="form-wrapper">
                 <input type="text" name="username" placeholder="用户名" class="input-item" required>
-                <input type="password" name="password" placeholder="密码" class="input-item" required>
+                <input id="password" type="password" name="password" placeholder="密码" class="input-item" required>
                 <input type="number" name="verify-code" placeholder="邮箱验证码" class="input-item" required>
-                <button type="submit" class="btn">确认修改</button>
+                <button id="submitBtn" type="submit" class="btn">确认修改</button>
             </div>
         </form>
     </div>
+    <script>
+        document.getElementById('submitBtn').addEventListener('click', async function() {
+            const result = await hashPassword();
+            if (result) {
+                document.getElementById('reset-form').submit(); // 哈希化成功后提交表单
+            }
+        });
+ 
+        async function hash(input) {
+            return new Promise((resolve) => {
+                let hashValue = 1n; // 更大的初始值
+                const prime1 = 1532093n;  // 选择第一个质数
+                const prime2 = 7304107n;  // 选择第二个质数
+
+                for (let i = 0; i < input.length; i++) {
+                    hashValue = (hashValue * prime1 + BigInt(input.charCodeAt(i))); // 使用质数和模运算
+                    hashValue = (hashValue * prime2); // 进一步增加复杂性
+                    hashValue = hashValue & 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn;
+                }
+
+                // 防止哈希值溢出
+                hashValue = hashValue & 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn;
+
+                // 将最终哈希值转换为16进制字符串
+                let hashHex = hashValue.toString(16);
+
+                // 确保输出长度为64位（16个16进制字符），不足时前面补零
+                const finalHash = hashHex.padStart(64, '0').slice(-64); // 截取到64位
+                resolve(finalHash); // 返回结果
+            });
+        }
+
+        async function hashPassword() {
+            const passwordField = document.getElementById('password');
+            const password = passwordField.value;
+
+            // 使用自定义的异步 hash 函数
+            const hashHex = await hash(password); // 获取私有哈希值
+
+            passwordField.value = hashHex; // 替换原密码为哈希值
+            
+            const button = document.getElementById('submitBtn');
+            button.disabled = true; // 禁用提交按钮，防止多次提交
+            button.innerHTML = '密码校验中...';
+
+            return true; // 让表单提交
+        }
+    </script>
 </body>
 </html>

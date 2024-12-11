@@ -7,6 +7,7 @@ import traceback
 import os
 from time import sleep
 from functools import wraps
+import datetime
 
 en_key = ""  # 加密密钥
 
@@ -38,6 +39,8 @@ def if_login(func):
         if "id" not in session:  # 如果用户未登录
             return redirect("/login")  # 重定向到登录页面
         if session["id"] != id:  # 如果用户 ID 不匹配
+            return redirect("/login")  # 重定向到登录页面
+        if Person.query.filter_by(id=id).first() is None:  # 如果用户不存在
             return redirect("/login")  # 重定向到登录页面
         if request.cookies.get("pass_key"):  # 如果存在密码重置密钥
             return redirect("/login")  # 重定向到密码重置页面
@@ -207,6 +210,12 @@ def submit(passkey):
 @if_login
 def file_submit(file_dir, id):
     file_dir += "/" + id
+    notification = Notification.query.filter_by(file_path=file_dir).first()  # 获取通知信息
+    if notification:
+        deadline = notification.deadline
+        if deadline and deadline < datetime.datetime.now():
+            err = Html_Error("提交失败", "提交截止时间已过")  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
     person = Person.query.filter_by(id=session["id"]).first()  # 获取用户信息
     if not os.path.exists(file_dir):
         err = Html_Error("非法文件路径", "不要随意访问文件")  # 显示错误信息
@@ -238,12 +247,12 @@ def download_file_from_notification(notification_id):
         err = Html_Error("权限不足", "你没有权限下载文件")  # 显示错误信息
         return err.get_html()  # 返回错误信息页面
     if not os.path.exists(notification.file_path):
-        err = Html_Error("文件不存在", "文件不存在")  # 显示错误信息
+        err = Html_Error("文件不存在", "请重新投放通知")  # 显示错误信息
         return err.get_html()  # 返回错误信息页面
     file_dir = notification.file_path
 
     # 定义压缩包的名称
-    zip_file_name = "submission.zip"  # 这里可以自定义为你想要的名称
+    zip_file_name = f"{class_.name}_{notification.title}.zip"  # 这里可以自定义为你想要的名称
     zip_file_path = os.path.join(file_dir, zip_file_name)  # 将 ZIP 文件保存在 file_dir 的同一目录下
 
     # 如果压缩包已经存在，先删除它
@@ -251,6 +260,11 @@ def download_file_from_notification(notification_id):
         os.remove(zip_file_path)
     except FileNotFoundError:
         pass
+
+    files = os.listdir(file_dir)
+    if len(files) == 0:
+        err = Html_Error("文件为空", "没有人提交文件")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
 
     import shutil
 
@@ -299,20 +313,26 @@ def create_class():
         else:
             err = Html_Error("输入错误", '含有非法字符<a href="/create_class">返回创建课程</a>')  # 显示错误信息
             return err.get_html()  # 返回错误信息页面
-        if not class_name or not members or not administrators:
-            err = Html_Error("不能为空", '课程名称与成员与管理员均不能为空<a href="/create_class">返回创建课程</a>')  # 显示错误信息
+        if not class_name:
+            err = Html_Error("不能为空", '课程名称不能为空<a href="/create_class">返回创建课程</a>')  # 显示错误信息
             return err.get_html()  # 返回错误信息页面
         class_id = random.randint(100000, 999999)  # 生成随机课程 ID
         while Class.query.filter_by(id=class_id).first():  # 防止 ID 重复
             class_id = class_id + 1
-        class_members = members.split("\n")
-        class_administrators = administrators.split("\n")
-        member_remove = []
-        for member in class_members:
-            if member in class_administrators:
-                member_remove.append(member)
-        for member in member_remove:
-            class_members.remove(member)
+        try:
+            class_administrators = [int(people.id)]
+            class_members = []
+            if administrators != "":
+                for i in administrators.split("\n"):
+                    if int(i) not in class_administrators:
+                        class_administrators.append(int(i))
+            if members != "":
+                for i in members.split("\n"):
+                    if int(i) not in class_members and int(i) not in class_administrators:
+                        class_members.append(int(i))
+        except ValueError:
+            err = Html_Error("输入错误", '请输入正确的学号，并用换行分隔不同学号<a href="/create_class">返回创建课程</a>')  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
         Class.new(class_id, class_name, class_administrators, class_members)
         return redirect("/class/" + str(class_id))  # 重定向到课程页面
     widget = open("templates/create_class.html", "r", encoding="utf-8").read()
@@ -331,10 +351,11 @@ def feedback():
             err = Html_Error("内容不能为空", '内容不能为空<a href="/feedback">返回反馈</a>')  # 显示错误信息
             return err.get_html()  # 返回错误信息页面
         with open("data/feedback.txt", "a", encoding="utf-8") as f:
-            f.write(people.name + ":" + content + "\n")  # 写入文件
+            f.write(people.username + ":" + people.name + ":" + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ":" + content + "\n")  # 写入文件
+        return redirect("/")
     else:
-        page = """<textarea class="feedback-input" type="text" name="content" placeholder="请输入反馈内容"></textarea>
-        <button type="submit" class="btn">提交</button><script>alert("感谢您的反馈,我们会尽快处理")</script>"""
+        page = """<form method="post" class="feedback-form"><textarea class="feedback-input" type="text" name="content" placeholder="请输入反馈内容"></textarea>
+        <button type="submit" class="btn">提交</button><form>"""
         html = Html_index(people, page)
         return html.get_html()  # 返回反馈页面
 
@@ -392,7 +413,6 @@ def login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
-        print(username, password)
         person = Person.query.filter_by(username=username, password=password).first()
         if person:  # 如果用户名和密码正确
             id = person.id  # 获取用户 ID
@@ -419,7 +439,7 @@ def login():
         if generate_login_key(id) == key:  # 如果登录密钥正确
             session["id"] = id  # 将用户 ID 存储在会话中
             ips = Person.query.filter_by(id=id).first().ips
-            if request.remote_addr in ips.split(", "):  # 如果登录 IP 地址在 IP 地址列表中
+            if request.remote_addr in ips.split(","):  # 如果登录 IP 地址在 IP 地址列表中
                 return redirect("/")  # 重定向到主页
     except Exception:
         pass  # 忽略错误
@@ -513,7 +533,7 @@ def register():
         send_verify(email, name, random_code)  # 发送验证码邮件
         return redirect("/register2")  # 重定向到注册页面 2
     else:
-        if "id" in session or request.cookies.get("pass_key"):  # 如果已登录
+        if request.cookies.get("pass_key"):  # 如果已登录
             return redirect("/login")  # 重定向到登录页面
         else:
             return render_template("register.html")  # 渲染注册页面 1
@@ -617,10 +637,15 @@ def rm_user():
         return err.get_html()  # 返回确认删除账户信息页面
 
 
+@app.route("/about")
+def about():
+    return redirect("https://github.com/zpb911km/monitorTool")
+
+
 @app.errorhandler(Exception)
 def handle_error(e):
     # 使用traceback格式化错误信息
-    tb_lines = traceback.format_exception(type(e), e, e.__traceback__)  # 正确用位置参数
+    tb_lines = traceback.format_exception(type(e), e, e.__traceback__)
     for n, line in enumerate(tb_lines):
         if "web_server" in line:
             tb_lines = tb_lines[n:]
