@@ -26,9 +26,7 @@ async function submitForm() {
     document.getElementsByName("submit")[0].disabled = true;
     document.getElementsByName("submit")[0].innerText = "上传中...,请稍后...";
     document.getElementsByName("submitAction")[0].click();
-
-    // 使用setTimeout来显示上传成功的提示
-    setTimeout(() => {
-        alert("上传完毕");
-    }, 0);
+    setTimeout(function() {
+        document.getElementsByName("submit")[0].innerText = "即将在上传完成后跳转...";
+    }, 3000);
 }
