@@ -154,6 +154,9 @@ def class_write_notification(class_id):
         title = request.form["title"]
         content = request.form["content"]
         deadline = request.form["deadline"]
+        if not is_valid_input_str(title) or not is_valid_input_str(content):
+            err = Html_Error("输入错误", "含有非法字符")  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
         need_confirm = request.form.get("need_confirm", "off") == "on"
         need_submit = request.form.get("need_submit", "off") == "on"
         if need_confirm:
@@ -397,6 +400,9 @@ def login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
+        if not is_valid_input_str(username) or not is_valid_input_str(password):
+            err = Html_Error("输入错误", '用户名或密码含有非法字符<a href="/login">返回登录</a>')  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
         person = Person.query.filter_by(username=username, password=password).first()
         if person:  # 如果用户名和密码正确
             id = person.id  # 获取用户 ID
@@ -435,6 +441,9 @@ def reset():
     if request.method == "POST":
         id = request.form["id"]
         name = request.form["name"]
+        if not is_valid_input_str(id) or not is_valid_input_str(name):
+            err = Html_Error("输入错误", '用户名或姓名含有非法字符<a href="/reset">返回重置密码</a>')  # 显示错误信息
+            return err.get_html()  # 返回错误信息页面
         person = Person.query.filter_by(id=id, name=name).first()
         if not person:
             err = Html_Error("用户不存在", '用户不存在<a href="/login">返回登录</a>')  # 显示错误信息
