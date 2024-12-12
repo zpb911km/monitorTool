@@ -8,6 +8,11 @@ html {
     padding: 0;
 }
 
+header {
+    background-color: #1e2233bf;
+    color: #f2f2f2;
+}
+
 body {
     height: 100vh;
     padding: 0;
@@ -44,7 +49,7 @@ body::-webkit-scrollbar-thumb {
 .content {
     width: 75%; /* 增加内容区域宽度 */
     height: 100vh;
-    background-color: #2b2f38; /* 内容区域背景色 */
+    background-color: #2b2f3830; /* 内容区域背景色 */
     color: #e0e0e0;
     overflow-y: scroll;
     padding: 20px;
@@ -263,6 +268,7 @@ summary {
 
 .sidebar {
     overflow: hidden; /* 隐藏溢出部分 */
+    background-color: #2b2f389e;
 }
 
 .content-expanded {
@@ -273,4 +279,13 @@ summary {
 .content-collapsed {
     width: calc(100% - 50px); /* 收起状态的内容宽度，减去侧边栏宽度 */
     transition: width 0.3s; /* 动画过渡效果 */
+}
+
+.notification-box {
+    margin-bottom: 20px;
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    background-color: #2b2f389b;
+    margin: 20px;
 }
