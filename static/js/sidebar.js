@@ -29,7 +29,7 @@ toggleButton.addEventListener('click', function() {
                 button.textContent = button.getAttribute('data-fulltext');
             });
             toggleButton.textContent = ">收起侧边栏"; // 展开时恢复原文本
-        }, 300); // 延迟的时间，与动画时长相同
+        }, 250); // 延迟的时间，与动画时长相同
     }
 });
 

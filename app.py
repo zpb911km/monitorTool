@@ -2,7 +2,7 @@ from flask import Flask, send_file, jsonify, render_template, session, redirect,
 from flask_sqlalchemy import SQLAlchemy
 import random
 from init import app, db
-from core import Person, Class, Notification, Html_Error, Html_index, send_verify, send_warning, is_valid_email, is_valid_username, is_valid_password, parse_xls, is_valid_input_str, recursive_remove
+from core import Person, Class, Notification, Html_Error, Html_index, send_verify, send_warning, is_valid_email, is_valid_username, is_valid_password, parse_xls, is_valid_input_str, recursive_remove, zip_folder
 import traceback
 import os
 from time import sleep
@@ -254,23 +254,7 @@ def download_file_from_notification(notification_id):
     # 定义压缩包的名称
     zip_file_name = f"{class_.name}_{notification.title}.zip"  # 这里可以自定义为你想要的名称
     zip_file_path = os.path.join(file_dir, zip_file_name)  # 将 ZIP 文件保存在 file_dir 的同一目录下
-
-    # 如果压缩包已经存在，先删除它
-    try:
-        os.remove(zip_file_path)
-    except FileNotFoundError:
-        pass
-
-    files = os.listdir(file_dir)
-    if len(files) == 0:
-        err = Html_Error("文件为空", "没有人提交文件")  # 显示错误信息
-        return err.get_html()  # 返回错误信息页面
-
-    import shutil
-
-    # 压缩文件夹
-    shutil.make_archive(os.path.splitext(zip_file_path)[0], "zip", file_dir)
-
+    zip_folder(file_dir, zip_file_path)  # 压缩文件夹
     # 创建响应并发送 ZIP 文件
     response = send_file(zip_file_path, as_attachment=True)
     response.headers["Content-Disposition"] = "attachment; filename=" + os.path.basename(zip_file_path)
@@ -616,12 +600,14 @@ def rm_user():
         # 验证完了
         Person.query.filter_by(id=id).delete()  # 删除用户
         for class_ in Class.query.all():  # 删除用户在所有班级中的记录
-            if str(session["id"]) in class_.students:
-                class_.students.replace(str(session["id"]) + ",", "").replace(str(session["id"]), "")
-            elif str(session["id"]) in class_.administrators:
-                class_.administrators.replace(str(session["id"]) + ",", "").replace(str(session["id"]), "")
-            class_.unsynced_peoples += str(session["id"]) + ","
-        # TODO: 删通知
+            if session["id"] in class_.students:
+                class_.students = class_.students.replace(session["id"] + ",", "").replace(session["id"], "")
+                class_.unsynced_peoples += session["id"] + ","
+            elif session["id"] in class_.administrators:
+                class_.administrators = class_.administrators.replace(session["id"] + ",", "").replace(session["id"], "")
+                class_.unsynced_peoples += session["id"] + ","
+            if class_.administrators == "":
+                class_.dismiss()  # 如果班级没有管理员,解散班级
         db.session.commit()  # 提交数据库更改
         session.pop("id", None)  # 从会话中移除用户 ID
         session.pop("name", None)  # 从会话中移除用户姓名
@@ -633,7 +619,7 @@ def rm_user():
         resp.set_cookie("key", "", expires=0)  # 清除登录密钥作为 cookie
         return resp  # 返回修改后的响应对象
     else:
-        err = Html_Error("确认删除账户吗？", '再问你一遍,确认删除账户吗？<form method="post"><input class="btn" type="submit" value="确认"></form>')  # 显示确认删除账户信息页面
+        err = Html_Error("确认删除账户吗？", '再确认一遍,确认删除账户吗？<form method="post"><input style="margin-right: 10px; background-color: #f00; color: #fff; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;" type="submit" value="确认"></form>')  # 显示确认删除账户信息页面
         return err.get_html()  # 返回确认删除账户信息页面
 
 

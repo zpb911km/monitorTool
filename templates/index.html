@@ -6,6 +6,7 @@
     <link rel="stylesheet" type="text/css" href="/static/css/style.css">
 </head>
 <body>
+    <canvas id="myCanvas" class="myCanvas" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; z-index: -1;"></canvas>
     <header>
         <div>
             <span>当前用户: <!--name--></span>
@@ -16,8 +17,8 @@
             <a href="/feedback">发送反馈</a>
         </div>
     </header>
-    <div style="display: flex; flex: 1;">
-        <div class="sidebar expanded" id="sidebar"> <!-- 默认展开状态 -->
+    <div style="display: flex; flex: 1;background: transparent;">
+        <div class="sidebar expanded" id="sidebar">
             <nav id="sidebar-nav">
                 <div style="display: flex;justify-content: flex-end;">
                     <button id="toggle-button" class="sidebar-button" style="display: none;">>收起侧边栏</button> <!-- 添加按钮 -->
@@ -42,5 +43,6 @@
     </div>
 
     <script src="/static/js/sidebar.js"></script>
+    <script src="/static/js/bgAnim.js"></script>
 </body>
 </html>

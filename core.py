@@ -526,7 +526,7 @@ class Notification(db.Model):
             color = "#555555"
         else:
             color = "#FFFFFF"
-        widget += f'<div style="margin-bottom: 20px; border: none; padding: 10px; border-radius: 5px; box-shadow: 10px 10px 10px {color}; background-color: #272733; margin: 20px;">\n'
+        widget += f'<div class="notification-box" style="box-shadow: 10px 10px 10px {color};">\n'
         widget += "<h2>来自" + class_.name + "的通知:</h2>\n"
         widget += "<h3>" + self.title + "</h3>\n"
         widget += "<p>" + self.content.replace("\n", "<br>").replace("\r", "") + "</p>\n"
@@ -925,3 +925,21 @@ def recursive_remove(folder_path):
     # 最后删除空的目标文件夹
     os.rmdir(folder_path)
     print("已删除文件夹:", folder_path)
+
+
+def zip_folder(file_dir: str, zip_file_path: str):
+    # 如果压缩包已经存在，先删除它
+    try:
+        os.remove(zip_file_path)
+    except FileNotFoundError:
+        pass
+
+    files = os.listdir(file_dir)
+    if len(files) == 0:
+        err = Html_Error("文件为空", "没有人提交文件")  # 显示错误信息
+        return err.get_html()  # 返回错误信息页面
+
+    import shutil
+
+    # 压缩文件夹
+    shutil.make_archive(os.path.splitext(zip_file_path)[0], "zip", file_dir)
