@@ -155,7 +155,6 @@ function animate(currentTime) {
         particle.update(deltaTime);
         particle.draw();
     });
-    console.log(deltaTime, particles.length);
 
     requestAnimationFrame(animate);
 }

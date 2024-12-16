@@ -240,28 +240,55 @@ def file_submit(file_dir, id):
 def download_file_from_notification(notification_id):
     notification = Notification.query.filter_by(id=notification_id).first()  # 获取通知信息
     if not notification:
-        err = Html_Error("通知不存在", "通知不存在")  # 显示错误信息
-        return err.get_html()  # 返回错误信息页面
+        return jsonify({"status": "error", "msg": "通知不存在"})
     class_ = Class.query.filter_by(id=notification.class_id).first()  # 获取课程信息
     if not class_:
-        err = Html_Error("课程不存在", "课程不存在")  # 显示错误信息
-        return err.get_html()  # 返回错误信息页面
+        return jsonify({"status": "error", "msg": "课程不存在"})
     if str(session["id"]) not in class_.administrators.split(","):
-        err = Html_Error("权限不足", "你没有权限下载文件")  # 显示错误信息
-        return err.get_html()  # 返回错误信息页面
+        return jsonify({"status": "error", "msg": "你没有权限下载文件"})
     if not os.path.exists(notification.file_path):
-        err = Html_Error("文件不存在", "请重新投放通知")  # 显示错误信息
-        return err.get_html()  # 返回错误信息页面
+        return jsonify({"status": "error", "msg": "地址不存在"})
     file_dir = notification.file_path
-
+    if len(os.listdir(file_dir)) == 0:
+        return jsonify({"status": "error", "msg": "文件为空"})
     # 定义压缩包的名称
     zip_file_name = f"{class_.name}_{notification.title}.zip"  # 这里可以自定义为你想要的名称
     zip_file_path = os.path.join(file_dir, zip_file_name)  # 将 ZIP 文件保存在 file_dir 的同一目录下
     zip_folder(file_dir, zip_file_path)  # 压缩文件夹
-    # 创建响应并发送 ZIP 文件
-    response = send_file(zip_file_path, as_attachment=True)
-    response.headers["Content-Disposition"] = "attachment; filename=" + os.path.basename(zip_file_path)
-    return response
+    return jsonify({"status": "success", "file": zip_file_path})
+
+
+@app.route("/get_file_size", methods=["GET"])
+@if_login
+def get_file_size():
+    filename = request.args.get("filename")
+    if not filename.startswith("data/submissions/") or not filename.endswith(".zip"):
+        return jsonify({"status": "error", "msg": "文件名不合法"})
+        # return redirect("/reset2")
+    file_path = filename
+    total_size = os.path.getsize(file_path)
+    return jsonify({"status": "success", "size": total_size})
+
+
+@app.route("/download_chunk", methods=["GET"])
+@if_login
+def download_chunk():
+    filename = request.args.get("filename")
+    chunk = request.args.get("chunk", 0, type=int)
+    file_path = filename
+    if not filename.startswith("data/submissions/") or not filename.endswith(".zip"):
+        return jsonify({"status": "error", "msg": "文件名不合法"})
+
+    chunk_size = 1024 * 1024  # 1MB
+    start = chunk * chunk_size
+    end = start + chunk_size
+
+    with open(file_path, "rb") as f:
+        f.seek(start)
+        data = f.read(end - start)
+    import io
+
+    return send_file(io.BytesIO(data), as_attachment=True, download_name=f"{filename.split('/')[-1]}.part{chunk}")
 
 
 @app.route("/class/<class_id>/delete_notification/<notification_id>")
@@ -381,11 +408,6 @@ def update_schedule():
     widget = open("templates/upload.html", "r", encoding="utf-8").read()
     html = Html_index(people, widget)
     return html.get_html()
-
-
-@app.route("/test", methods=["GET", "POST"])
-def test():
-    return render_template("index2.html")
 
 
 # 图标路由
