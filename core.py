@@ -371,6 +371,7 @@ class Class(db.Model):
         if str(people.id) in self.administrators:
             widget = open("templates/class_admin.html", "r", encoding="utf-8").read()
             widget = widget.replace("<!--class_id-->", self.id)
+            widget = widget.replace("<!--class_name-->", self.name)
             students = []
             for student_id in self.students.split(","):
                 student = Person.query.filter_by(id=student_id).first()
@@ -396,6 +397,7 @@ class Class(db.Model):
         elif str(people.id) in self.students:
             widget = open("templates/class_stu.html", "r", encoding="utf-8").read()
             widget = widget.replace("<!--class_id-->", self.id)
+            widget = widget.replace("<!--notificaitons-->", Notification.get_html_widget(class_=self, people=people))
             html = Html_index(people, widget)
             return html.get_html()  # 返回课程成员页面
         else:
@@ -557,7 +559,10 @@ class Notification(db.Model):
                 if person is not None:
                     widget += f"<li>{person.name}</li>"
             widget += "</ul></details>"
-            widget += f'<div style="text-align: right;"><button style="padding: 5px 10px; background-color: #AF4C50; color: white; border: none;" onclick="location.href=\'/class/{class_.id}/delete_notification/{self.id}\'">删除通知</button><button style="padding: 5px 10px; background-color: #4CAF50; color: white; border: none;" onclick="location.href=\'/download_file_from_notification/{self.id}\'">下载文件</button></div>'
+            widget += f'<div style="text-align: right;"><button style="padding: 5px 10px; background-color: #AF4C50; color: white; border: none;" onclick="location.href=\'/class/{class_.id}/delete_notification/{self.id}\'">删除通知</button><button style="padding: 5px 10px; background-color: #4CAF50; color: white; border: none;" onclick="startDownload(\'{self.id}\')">下载文件</button></div>'
+            widget += '<div id="progress" style="width: 0%;height: 20px;background-color: green;"></div>'
+            script = open("static/js/download.js", "r", encoding="utf-8").read()
+            widget += "<script>" + script + "</script>"
         widget += "</div>\n"
         if people is not None:
             widget += "<script>"
