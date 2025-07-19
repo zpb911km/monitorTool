@@ -1,4 +1,4 @@
-from flask import Flask, send_file, jsonify, render_template, session, redirect, url_for, request, make_response, send_from_directory
+from flask import Flask, json, send_file, jsonify, render_template, session, redirect, url_for, request, make_response, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 import random
 from init import app, db
