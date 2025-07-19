@@ -340,7 +340,9 @@ class Class(db.Model):
             if len(schedule) == 0:
                 schedule = student.raw_courses_count()
             else:
-                schedule = merge_list(schedule, student.raw_courses_count())
+                student_schedule = student.raw_courses_count()
+                if len(student_schedule) != 0:
+                    schedule = merge_list(schedule, student_schedule)
         for admin_id in self.administrators.split(","):
             admin = Person.query.filter_by(id=admin_id).first()
             if admin is None:
@@ -348,7 +350,9 @@ class Class(db.Model):
             if len(schedule) == 0:
                 schedule = admin.raw_courses_count()
             else:
-                schedule = merge_list(schedule, admin.raw_courses_count())
+                admin_schedule = admin.raw_courses_count()
+                if len(admin_schedule) != 0:
+                    schedule = merge_list(schedule, admin_schedule)
         widget = ""
         for w in range(20):
             widget += "第" + str(w + 1) + "周<br />" + '<table border="1" width="100%">'

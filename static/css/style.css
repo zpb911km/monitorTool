@@ -289,3 +289,41 @@ summary {
     background-color: #2b2f389b;
     margin: 20px;
 }
+
+.datetime-local {
+    display: block;
+    width: 100%;
+    margin-bottom: 15px;
+    padding: 10px;
+    border: 1px solid #4caf50; /* 绿色边框 */
+    border-radius: 5px;
+    font-size: 18px;
+    outline: none;
+    background-color: #3c434e; /* 深色背景 */
+    color: #ecf0f1;
+    transition: border-color 0.3s; /* 添加过渡效果 */
+}
+
+.datetime-local:focus {
+    border-color: #3bbd6a; /* 悬停时变亮 */
+}
+
+.datetime-local::-webkit-calendar-picker-indicator {
+    background: #4caf50; /* 绿色日历图标 */
+    color: white;
+    cursor: pointer;
+}
+
+.datetime-local::-webkit-calendar-picker-indicator:hover {
+    background: #3bbd6a; /* 悬停时日历图标变亮 */
+}
+
+.datetime-local::-moz-calendar-picker-indicator {
+    background: #4caf50; /* 绿色日历图标 */
+    color: white;
+    cursor: pointer;
+}
+
+.datetime-local::-moz-calendar-picker-indicator:hover {
+    background: #3bbd6a; /* 悬停时日历图标变亮 */
+}
